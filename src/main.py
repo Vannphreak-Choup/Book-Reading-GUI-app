@@ -45,7 +45,7 @@ btn_open = ctk.CTkButton(
     top_frame, 
     text="Open",
     image=Open_icon,
-    command="left"
+    compound="left"
 )
 btn_open.pack(side="left", padx=5)
 
