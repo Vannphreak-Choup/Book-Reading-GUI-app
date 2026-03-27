@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from PIL import Image
+from button import add_pdf
 
 ctk.set_appearance_mode("Dark")   # dark mode
 ctk.set_default_color_theme("blue")
@@ -9,6 +10,15 @@ app.title("Read da book")
 app_icon = "assets/icon/book2.ico"
 app.iconbitmap(app_icon)
 app.geometry("900x500")
+
+# function to handle the add pdf button click
+def handle_add_pdf():
+    # return the file path and name as file path and file name
+    filepath, filename = add_pdf()
+    # if a file is selected, add the file name to the file list
+    if filepath:
+        Label = ctk.CTkLabel(file_list, text=filename)
+        Label.pack(anchor="w", padx=5)
 
 # the 3 buttons frame on top
 top_frame = ctk.CTkFrame(app)
@@ -27,7 +37,8 @@ btn_add = ctk.CTkButton(
     top_frame, 
     text="Add PDF", 
     image=Add_icon, 
-    compound="left"
+    compound="left",
+    command=handle_add_pdf
 
 )
 btn_add.pack(side="left", padx=5)
@@ -72,15 +83,18 @@ content_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
 # left frame 
 left_frame = ctk.CTkFrame(content_frame, width=200)
-left_frame.pack(side="left", fill="y", padx=5, pady=5)
+left_frame.pack(side="left", fill="y", padx=5)
 
 # file list in the left frame
 file_list = ctk.CTkScrollableFrame(left_frame)
 file_list.pack(fill="both", expand=True)
 
+ctk.CTkLabel(file_list, text="PDF file list").pack(anchor="w", padx=5)
+
+
 # right frame
 right_frame = ctk.CTkFrame(content_frame)
-right_frame.pack(side="right", fill="both", expand=True, padx=5, pady=5)
+right_frame.pack(side="right", fill="both", expand=True, padx=5)
 
 # the viewer content in the right frame
 viewer = ctk.CTkLabel(right_frame, text="PDF")
