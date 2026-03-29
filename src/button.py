@@ -12,4 +12,3 @@ def add_pdf():
         return filename, os.path.basename(filename)
     
     return None, None
-    
