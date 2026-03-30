@@ -1,6 +1,7 @@
 import customtkinter as ctk
+import threading
 import fitz
-from PIL import Image, ImageTk
+from PIL import Image
 from button import add_pdf
 import data
 
@@ -16,10 +17,16 @@ app.title("Read da book")
 # the app icon or logo
 app_icon = "assets/icon/book2.ico"
 app.iconbitmap(app_icon)
-# the size of the app in app when not open fullscreen
-app.geometry("900x500")
-# to store pdf images
-pdf_images = []
+# the size of the app when not open fullscreen
+app.geometry("1200x600")
+
+# the default zoom level when open a pdf file
+zoom_level = 1.0
+# initialize the current page to 0 when open a pdf file
+current_page = 0
+# a variable to track the generation of the render, we will use it to cancel the render when the user open a new pdf file or zoom in/out
+render_generation = 0
+
 # the font and size we use for the app
 my_font = ctk.CTkFont(family="Arial", size=15, weight="bold")
 
@@ -33,6 +40,8 @@ def handle_add_pdf():
 
         Label = ctk.CTkLabel(file_list, text=filename)
         Label.pack(anchor="w", padx=5)
+        # store the filename as key and the label as value inside file_labels
+        data.file_labels[filename] = Label
 
         # listen for left mouse click
         Label.bind("<Button-1>", lambda e, name=filename: select_file(name))
@@ -40,11 +49,27 @@ def handle_add_pdf():
 # when user click a file it save which file is selected and print it out
 def select_file(filename):
     data.selected_files = filename
-    print(f"selected: {filename}")
+
+    # check inside the file_labels value and highlight the selected file as gray when the user click on the file
+    for lbl in data.file_labels.values():
+        lbl.configure(fg_color="transparent")
+    data.file_labels[filename].configure(fg_color="gray")
+    
+    print(f"selected file: {filename}")
+
+def zoom_in():
+    global zoom_level
+    zoom_level += 0.2
+    render_all_page()
+
+def zoom_out():
+    global zoom_level
+    zoom_level = max(0.4, zoom_level - 0.2)
+    render_all_page()
 
 # when user click open it checks if there is a file to select
 def open_pdf():
-    global pdf_images
+    global current_page
     if not data.selected_files:
         print("No file selected")
         return
@@ -52,37 +77,67 @@ def open_pdf():
     # if there is it look inside the data and display the filepath
     filepath = data.pdf_files[data.selected_files]
     
-    # loop inside the pdf containter and get everything inside it using .winfo_children()
-    for widget in pdf_containter.winfo_children():
-        # clear the screen so the new pdf don't stack on top of the old one
-        widget.destroy()
-    # clear the pdf image list so it doesn't store the old one when you open a new one
-    pdf_images.clear()
+    # open the file path using fitz
+    data.doc = fitz.open(filepath)
+
+    render_all_page()
+
+def render_all_page_thread(my_generation):
+    # if the document is not open, return
+    if data.doc is None:
+        return
 
     try:
-        doc = fitz.open(filepath)
-        # loop through all the page
-        for page_num in range(len(doc)):
-            # load the page one at a time
-            page = doc.load_page(page_num)
-            # render the page into pixel like a screenshot
-            pix = page.get_pixmap()
-
-            # convert those pixel into image using PIL (pillow)
-            # (RGB for color), (pix.width and pix.height for image size), (pix.samples for pixel data)
+        for page_num in range(len(data.doc)):
+            # if the generation is not the same as the current generation, it means the user has open a new pdf file or zoom in/out, so we cancel the render
+            if my_generation != render_generation:
+                print(f"Render {my_generation} cancelled")
+                return
+            # render the page
+            page = data.doc.load_page(page_num)
+            # we use the zoom level to render the page, so when the user zoom in/out it will render the page with the new zoom level
+            pix = page.get_pixmap(matrix=fitz.Matrix(zoom_level, zoom_level))
+            # convert the pixmap to image using PIL
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            # resize the image to fit the UI
-            img = img.resize((2000, int(2000 * pix.height / pix.width)))
-
-            # convert it into what tkinter can display and add it into the pdf images
-            tk_img = ImageTk.PhotoImage(img)
-            pdf_images.append(tk_img)
-
-            # create a label widget and display the image (for the (text=""), this one remove the text)
-            label = ctk.CTkLabel(pdf_containter, image=tk_img, text="")
-            label.pack(anchor="center", pady=10)
+            # if the generation is the same as the current generation, it means the user has not open a new pdf file or zoom in/out, so we can display the page
+            if my_generation == render_generation:
+                app.after(0, lambda img=img, num=page_num, gen=my_generation: display_page(img, num, gen))
     except Exception as e:
-        print(f"Error Printing PDF: {e}")
+        print(f"Thread error: {e}")
+
+def display_page(img, page_num, my_generation):
+    if my_generation != render_generation:
+        return
+    
+    ctk_img = ctk.CTkImage(
+        light_image=img,
+        dark_image=img,
+        size=(img.width, img.height)
+    )
+    data.pdf_images.append(ctk_img)
+    label = ctk.CTkLabel(
+        pdf_containter,
+        image=ctk_img,
+        text="",
+        compound="top"
+    )
+    label.pack(pady=10)
+
+# render the current page of the pdf file
+def render_all_page():
+    global render_generation
+    render_generation += 1
+    my_generation = render_generation
+    # clear old page immediately on the main thread before starting the thread
+    for widget in pdf_containter.winfo_children():
+        widget.destroy()
+    data.pdf_images.clear()
+
+    threading.Thread(
+        target=render_all_page_thread,
+        args=(my_generation,),
+        daemon=True
+    ).start()
 
 # the 3 buttons frame on top
 top_frame = ctk.CTkFrame(app)
@@ -144,6 +199,20 @@ btn_remove = ctk.CTkButton(
     font=my_font
 )
 btn_remove.pack(side="left", padx=5)
+
+btn_zoom_in = ctk.CTkButton(
+    top_frame,
+    text="Zoom +",
+    command=zoom_in
+)
+btn_zoom_in.pack(side="right", padx=5)
+
+btn_zoom_out = ctk.CTkButton(
+    top_frame,
+    text="Zoom -",
+    command=zoom_out
+)
+btn_zoom_out.pack(side="right", padx=5)
 
 # frame for both the left and right 
 content_frame = ctk.CTkFrame(app)
