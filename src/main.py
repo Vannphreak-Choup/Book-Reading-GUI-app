@@ -203,14 +203,16 @@ btn_remove.pack(side="left", padx=5)
 btn_zoom_in = ctk.CTkButton(
     top_frame,
     text="Zoom +",
-    command=zoom_in
+    command=zoom_in,
+    font=my_font
 )
 btn_zoom_in.pack(side="right", padx=5)
 
 btn_zoom_out = ctk.CTkButton(
     top_frame,
     text="Zoom -",
-    command=zoom_out
+    command=zoom_out,
+    font=my_font
 )
 btn_zoom_out.pack(side="right", padx=5)
 
