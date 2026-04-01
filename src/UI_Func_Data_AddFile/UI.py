@@ -137,4 +137,6 @@ def build(app):
     Data.pdf_container = ctk.CTkScrollableFrame(right_frame)
     Data.pdf_container.pack(fill="both", expand=True)
 
+    # start the scroll polling loop that checks which pages are visible and need to be rendered, 
+    # we call it here so when the app opens it will keep calling itself every 100ms to check for scroll changees and render pages as needed
     Data.app.after(100, poll_scroll)
