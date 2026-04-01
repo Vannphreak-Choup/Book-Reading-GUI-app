@@ -14,14 +14,14 @@ render_generation = 0
 # used to debounce zoom so rapid clicks don't spawn many threads
 _zoom_after_id = None
 
-# used to debounce the scroll check so it doesn't fire on every pixel
-_scroll_after_id = None
-
 # initialize the current page to 0 when opening a pdf file
 current_page = 0
 
+# track the last known scroll position to detect change
+_last_scroll_pos = None
+
 # how many pages above and below the visible area we render ahead of time
-BUFFER_PAGES = 15
+BUFFER_PAGES = 1
 
 # function to handle the add pdf button click
 def handle_add_pdf():
@@ -55,6 +55,8 @@ def select_file(filename):
 def zoom_in():
     global zoom_level, _zoom_after_id
     zoom_level += 0.2
+    # if there is already a zoom scheduled, cancel it and schedule a new one for 300ms later, 
+    # so if the user clicks rapidly it won't spawn many renders but just wait until they are done zooming to render the pages
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
     _zoom_after_id = Data.app.after(300, setup_placeholders)
@@ -151,88 +153,77 @@ def setup_placeholders():
         # track whether this page has been rendered yet
         Data.page_rendered[page_num] = False
 
-    # listen for scroll events so we know when to render new pages
-    Data.pdf_container._parent_canvas.bind("<Configure>", lambda e: on_scroll())
-    Data.pdf_container._parent_canvas.bind("<MouseWheel>", lambda e: on_scroll())
-    Data.pdf_container._parent_canvas.bind("<Button-4>", lambda e: on_scroll())
-    Data.pdf_container._parent_canvas.bind("<Button-5>", lambda e: on_scroll())
-
-    # make the inner canvas stretch to fill the full width of the scrollable frame
-    # so pages stay centered even when the window is resized or goes fullscreen
+    # bind to the canvas configure event to check visible pages whenever the scroll region changes (e.g. when zooming)
     Data.pdf_container._parent_canvas.bind("<Configure>", lambda e: (
-    Data.pdf_container._parent_canvas.itemconfig("all", width=e.width),
-    on_scroll()
+        Data.pdf_container._parent_canvas.itemconfig("all", width=e.width), 
+        check_visible_pages()
 ))
+    # start the scroll polling loop
+    poll_scroll()
 
-    # do the first render pass right away for the pages already in view
-    on_scroll()
+# when the user clicks open it calls this function to set up the placeholder frames and start lazy loading the pages as they scroll into view
+def poll_scroll():
+    global _last_scroll_pos
+    # if there is an open document and there are page frames set up, check if the scroll position has changed since the last time we checked, 
+    # and if so check which pages are visible and need to be rendered
+    if Data.doc is not None and Data.page_frames:
+        current_pos = Data.pdf_container._parent_canvas.yview()
+        # if the scroll position has changed since the last time we checked, check which pages are visible and need to be rendered
+        if current_pos != _last_scroll_pos:
+            _last_scroll_pos = current_pos
+            check_visible_pages()
+    # check again after 100ms
+    Data.app.after(100, poll_scroll)
 
-# called whenever the user scrolls, checks which pages are now visible and renders them
-def on_scroll():
-    global _scroll_after_id
-    # debounce so we don't check on every single scroll pixel
-    if _scroll_after_id:
-        Data.app.after_cancel(_scroll_after_id)
-    _scroll_after_id = Data.app.after(100, check_visible_pages)
-
-# figure out which pages are currently visible inside the scrollable frame
 # figure out which pages are currently visible inside the scrollable frame
 def check_visible_pages():
     if Data.doc is None or not Data.page_frames:
         return
-
-    # get the canvas inside the scrollable frame
+    # canvas = Data.pdf_container._parent_canvas gives us the canvas widget that is used for scrolling inside the CTkScrollableFrame, 
+    # we need it to get the current scroll position and visible area
     canvas = Data.pdf_container._parent_canvas
-
-    # get the visible scroll range as fractions (0.0 to 1.0)
-    scroll_top_frac, scroll_bottom_frac = canvas.yview()
-
-    # get the total scrollable height of the canvas content
+    # we call update_idletasks to make sure the scroll region and widget positions are up to date 
     canvas.update_idletasks()
-    total_height = canvas.winfo_height()
+
+    # get the total scrollable content height from the scroll region
     scroll_region = canvas.cget("scrollregion")
-
-    # if there is a scroll region set, use its height instead
-    if scroll_region:
-        try:
+    try:
+        # if the scroll region is true we split it into 4 parts and take the 4th part which is the total height, otherwise we just use the canvas height as a fallback
+        if scroll_region:
             total_height = float(scroll_region.split()[3])
-        except Exception:
+        else:
             total_height = canvas.winfo_height()
+    except Exception:
+        total_height = canvas.winfo_height()
 
-    # convert fractions to actual pixel positions
+    # get visible range in pixels
+    scroll_top_frac, scroll_bottom_frac = canvas.yview()
     visible_top = scroll_top_frac * total_height
     visible_bottom = scroll_bottom_frac * total_height
 
-    # if the pdf is short enough to fit without scrolling, just render everything
-    if scroll_top_frac == 0.0 and scroll_bottom_frac == 1.0:
-        for page_num in Data.page_frames:
-            if not Data.page_rendered[page_num]:
-                Data.page_rendered[page_num] = True
-                threading.Thread(
-                    target=render_page_thread,
-                    args=(page_num, render_generation),
-                    daemon=True
-                ).start()
-        return
-
-    # check every page frame to see if it overlaps with the visible area
+    # we loop through all the page frames
     for page_num, frame in Data.page_frames.items():
-        # skip if already rendered
+        # if this page has already been rendered, skip it
         if Data.page_rendered[page_num]:
             continue
 
-        # get the frame's position inside the scrollable canvas
         try:
             frame.update_idletasks()
-            frame_top = frame.winfo_y()
+            # winfo_rooty/rootx gives screen coords, so we convert to canvas content coords
+            canvas_root_y = canvas.winfo_rooty()
+            frame_screen_y = frame.winfo_rooty()
+            # offset of the frame within the canvas content (accounts for scroll position)
+            frame_top = frame_screen_y - canvas_root_y + visible_top
             frame_bottom = frame_top + frame.winfo_height()
         except Exception:
             continue
-
-        # add a buffer so we render pages slightly before they scroll into view
+        
+        # we add a buffer area above and below the visible area so pages just outside the view will also start rendering, 
+        # this makes scrolling smoother because the page is more likely to be ready by the time the user scrolls to it
         buffer = frame.winfo_height() * BUFFER_PAGES
 
-        # if the frame overlaps with the visible area (plus buffer), render it
+        # if any part of the frame is within the visible area plus buffer, 
+        # we start rendering it in a background thread and mark it as rendered so we don't start multiple threads for the same page
         if frame_bottom + buffer >= visible_top and frame_top - buffer <= visible_bottom:
             Data.page_rendered[page_num] = True
             threading.Thread(

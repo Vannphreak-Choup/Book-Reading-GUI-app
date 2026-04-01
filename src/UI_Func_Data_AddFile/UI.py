@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from PIL import Image
 from UI_Func_Data_AddFile import Data
-from UI_Func_Data_AddFile.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out 
+from UI_Func_Data_AddFile.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll
 
 # build all the UI widgets and attach them to the app window
 def build(app):
@@ -136,3 +136,5 @@ def build(app):
     # store in Data so logic.py can render pages into it
     Data.pdf_container = ctk.CTkScrollableFrame(right_frame)
     Data.pdf_container.pack(fill="both", expand=True)
+
+    Data.app.after(100, poll_scroll)
