@@ -1,4 +1,4 @@
-# store all the shared state here so both ui.py and logic.py can access it without circular imports
+# store all the shared state here so both ui.py and functionality.py can access it without circular imports
 
 # dictionary to store the pdf file name as key and the file path as value
 pdf_files = {}
@@ -15,7 +15,7 @@ doc = None
 # store the CTkImage objects so they don't get garbage collected
 pdf_images = []
 
-# store the widget references so logic.py can use them without importing ui.py
+# store the widget references so functionality.py can use them without importing ui.py
 pdf_container = None
 file_list = None
 app = None
