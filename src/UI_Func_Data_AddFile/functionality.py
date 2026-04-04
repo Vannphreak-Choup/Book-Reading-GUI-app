@@ -1,285 +1,360 @@
 import threading
+import queue
 import fitz
-from PIL import Image
+from PIL import Image, ImageTk
 import customtkinter as ctk
 from UI_Func_Data_AddFile.AddFile import add_pdf
 from UI_Func_Data_AddFile import Data
 
-# the default zoom level when opening a pdf file
+# the default zoom level or initial value
 zoom_level = 1.0
-
-# a variable to track the generation of the render, we use it to cancel the render when the user opens a new pdf or zooms
+# every time a user open a new file or zoom this generation go up by one
+# the worker thread compares its saved generation against this value, so if they are different outdated and thrown away without displaying
 render_generation = 0
 
-# used to debounce zoom so rapid clicks don't spawn many threads
+# store the id returned by app.after() for the zoom debounce timer
+# we keep it so we can cancel the previous timer if the user click zoom again
 _zoom_after_id = None
-
-# initialize the current page to 0 when opening a pdf file
-current_page = 0
-
-# track the last known scroll position to detect change
+# the scroll position we saw last time poll_scroll ran
+# we compare against this to avoid calling check_visible_page every 100ms
+# when the user isn't scrolling
 _last_scroll_pos = None
 
-# how many pages above and below the visible area we render ahead of time
-BUFFER_PAGES = 1
+# the vertical gap in pixels between pages on the canvas
+PAGE_GAP = 10
+# render this many pixels above/below the visible area
+BUFFER_PX = 600  
+# unload pages this far outside the visible area
+UNLOAD_PX = 1200 
 
-# function to handle the add pdf button click
+# canvas widget stored here so the whole module can reach it
+_canvas = None
+
+# stores the position and size of every page on the canvas
+# key   = page number (0-indexed)
+# value = (x, y, w, h) — top-left corner and size in canvas pixels
+# built once in _rebuild() and updated in _on_canvas_resize(
+_page_rects = {}
+
+# canvas image item ids  (page_num → canvas item id of the rendered image)
+_image_items = {}
+
+# PhotoImage refs — must be kept alive or tkinter GCs them
+_photo_refs  = {}
+
+# the queue that check_visible_pages pushes work onto and _worker pulls from
+# using a queue means the worker processes pages one at a time in order,
+# instead of spawning a new thread per page which causes memory spikes
+_render_queue = queue.Queue()
+
+# tracks which page numbers are currently sitting inside _render_queue
+# so _enqueue() never adds the same page twice while it's still waiting
+_queued_pages = set()
+
+# a lock that protects _queued_pages from being read/written simultaneously
+# by the main thread (_enqueue) and the worker thread (_worker)
+_queued_lock  = threading.Lock()
+
+def _worker():
+    # this loop lives forever inside the app
+    while True:
+        # block here until check_visible_pages put a page onto the queue
+        page_num, gen = _render_queue.get()
+        try:
+            # remove from the queued set so it can be re-queued later if needed
+            with _queued_lock:
+                _queued_pages.discard(page_num)
+            # if render_generation change or there's nothing in the doc skip it 
+            if gen != render_generation or Data.doc is None:
+                continue
+
+            # render the page
+            page = Data.doc[page_num]
+            pix  = page.get_pixmap(matrix=fitz.Matrix(zoom_level, zoom_level))
+            # convert to PIL
+            img  = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            del pix
+            # check if it is still in the same generation, if so app.after(0, fn) queues fn to run as soon as the main thread is free, which is the safe way to update the UI from a thread
+            if gen == render_generation:
+                Data.app.after(0, lambda i=img, n=page_num, g=gen: _show_page(i, n, g))
+            else:
+                del img
+        except Exception as e:
+            print(f"Render error page {page_num}: {e}")
+        finally:
+            # always call task_done so queue.join() work correctly if ever used
+            _render_queue.task_done()
+
+# start the worker thread
+threading.Thread(target=_worker, daemon=True).start()
+
+def _enqueue(page_num, gen):
+    # add a page to the render queue
+    with _queued_lock:
+        # if the page is already in the queue return
+        if page_num in _queued_pages:
+            return
+        # mark is as queue before releasing the lock
+        _queued_pages.add(page_num)
+
+    _render_queue.put((page_num, gen))
+
+# empty the render queue
+def _drain():
+    # clear the tracking set so _enqueue accept new pages immediately
+    with _queued_lock:
+        _queued_pages.clear()
+    # pull everything out of the queue without processing it
+    while not _render_queue.empty():
+        try:
+            _render_queue.get_nowait()
+            _render_queue.task_done()
+        except queue.Empty:
+            break
+# function to handle pdf when user click add pdf button
 def handle_add_pdf():
     # return the file path and name as filepath and filename
     filepath, filename = add_pdf()
-    # if a file is selected, add the file name to the file list
-    if filepath:
-        Data.pdf_files[filename] = filepath
+    if not filepath:
+        return
+    Data.pdf_files[filename] = filepath
+    label = ctk.CTkLabel(Data.file_list, text=filename)
+    label.pack(anchor="w", padx=5, pady=2)
+    # store the filename as key and the label as value inside file_label
+    Data.file_labels[filename] = label
+    # listen to the left mouse click on the button
+    label.bind("<Button-1>", lambda e, name=filename: select_file(name))
 
-        Label = ctk.CTkLabel(Data.file_list, text=filename)
-        Label.pack(anchor="w", padx=5)
-        # store the filename as key and the label as value inside file_labels
-        Data.file_labels[filename] = Label
-
-        # listen for left mouse click
-        Label.bind("<Button-1>", lambda e, name=filename: select_file(name))
-
-# when user clicks a file it saves which file is selected and prints it out
+# when user clicks a file it saves which file is selected print it
 def select_file(filename):
-    Data.selected_files = filename
-
-    # check inside the file_labels value and highlight the selected file as gray when the user clicks on the file
+    Data.selected_file = filename
     for lbl in Data.file_labels.values():
         lbl.configure(fg_color="transparent")
+        # highlights the file text in gray background
     Data.file_labels[filename].configure(fg_color="gray")
+    print(f"selected: {filename}")
 
-    print(f"selected file: {filename}")
-
-# when user clicks zoom in it increases the zoom level by 0.2
-# debounced so rapid clicks only trigger one render
+# when user click zoom in it increase the zoom level by 20%
 def zoom_in():
     global zoom_level, _zoom_after_id
     zoom_level += 0.2
-    # if there is already a zoom scheduled, cancel it and schedule a new one for 300ms later, 
-    # so if the user clicks rapidly it won't spawn many renders but just wait until they are done zooming to render the pages
+    # debounced so rapid clicks only trigger one render
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
-    _zoom_after_id = Data.app.after(300, setup_placeholders)
+    _zoom_after_id = Data.app.after(300, _rebuild)
 
-# when user clicks zoom out it decreases the zoom level by 0.2, but it will not go below 0.4
+# when user click zoom out it decrease the zoom level by 20% but it doesn't go beyond 40%
 def zoom_out():
     global zoom_level, _zoom_after_id
     zoom_level = max(0.4, zoom_level - 0.2)
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
-    _zoom_after_id = Data.app.after(300, setup_placeholders)
+    _zoom_after_id = Data.app.after(300, _rebuild)
 
-# when user clicks open it checks if there is a file selected
+# when user clicks open it check if there is a file selected
 def open_pdf():
-    global current_page
-    if not Data.selected_files:
+    if not Data.selected_file:
         print("No file selected")
         return
-
-    # if there is, look inside the Data and get the filepath
-    filepath = Data.pdf_files[Data.selected_files]
-
-    # open the file path using fitz
-    Data.doc = fitz.open(filepath)
-
-    # set up the placeholder frames and start lazy loading
-    setup_placeholders()
+    # close the previous document if there is one
+    if Data.doc:
+        Data.doc.close()
+    Data.doc = fitz.open(Data.pdf_files[Data.selected_file])
+    # draw the page placeholders and start lazy rendering 
+    _rebuild()
 
 # when user clicks remove it checks if there is a file selected
 def remove_pdf():
-    if not Data.selected_files:
+    if not Data.selected_file:
         print("No file selected")
         return
-    # if so:
-    # remove the file from the Data
-    del Data.pdf_files[Data.selected_files]
-    # remove the label from the file list
-    Data.file_labels[Data.selected_files].destroy()
-    # remove the label from the Data
-    del Data.file_labels[Data.selected_files]
-    # clear the selected file
-    Data.selected_files = None
+    # if so remove the file from the pdf_file
+    del Data.pdf_files[Data.selected_file]
+    # destroy the label widget in the left frame
+    Data.file_labels[Data.selected_file].destroy()
+    # then delete it fromn the file_labels
+    del Data.file_labels[Data.selected_file]
+    # then clear the selected file
+    Data.selected_file = None
 
-    # clear the pdf container
-    for widget in Data.pdf_container.winfo_children():
-        widget.destroy()
+    if Data.doc:
+        Data.doc.close()
+        Data.doc = None
+    # wipe everything off the canvas
+    _clear_canvas()
 
-    # clear all stored page Data
-    Data.pdf_images.clear()
-    Data.page_frames.clear()
-    Data.page_rendered.clear()
+# (only called once by the UI.py once it created the canvas widget) it is use to store canvas reference and bind the resize event
+def set_canvas(canvas):
+    global _canvas
+    _canvas = canvas
+    # when the user resize the window, recenter all the page rectangle
+    _canvas.bind("<Configure>", lambda e: _on_canvas_resize(e))
 
-# calculate the width and height of a page at the current zoom level without fully rendering it
-# we use this to set the placeholder frame size so the scrollbar feels accurate
-def get_page_size(page_num):
-    page = Data.doc.load_page(page_num)
-    rect = page.rect
-    width = int(rect.width * zoom_level)
-    height = int(rect.height * zoom_level)
-    return width, height
+# when the window resizes, reposition all page rects to stay centred
+def _on_canvas_resize(e):
+    # if there is no page to loaded yet, return
+    if not _page_rects:
+        return
+    # the new canvas width in pixels
+    canvas_w = e.width
 
-# create one empty gray frame per page so the scrollbar knows the full document height
-# we only fill in the actual image when the page scrolls into view
-def setup_placeholders():
+    for page_num, (x, y, w, h) in list(_page_rects.items()):
+        # calculate the new x so the page is centered in the canvas
+        new_x = max(0, (canvas_w - w) // 2)
+        # update the stored rect with the new x position
+        _page_rects[page_num] = (new_x, y, w, h)
+        # move the gray background rectangle on canvas to a new position
+        tag = f"bg_{page_num}"
+        _canvas.coords(tag, new_x, y, new_x + w, y + h)
+        # if this page has a rendered image on the canvas, move it too
+        if page_num in _image_items:
+            _canvas.coords(_image_items[page_num], new_x + w // 2, y + h // 2)
+    # re-checked which page are visible after the resize
+    check_visible_pages()
+
+# delete everything from the canvas and reset all tracking dicts
+def _clear_canvas():
+    global _page_rects, _image_items, _photo_refs
+    if _canvas:
+        _canvas.delete("all")
+    _page_rects.clear()
+    _image_items.clear()
+    _photo_refs.clear()
+
+# redraws all page placeholder retangles on the canvas (called when opening a new pdf or zooming)
+def _rebuild():
     global render_generation
     render_generation += 1
-
-    # clear everything first
-    for widget in Data.pdf_container.winfo_children():
-        widget.destroy()
-    Data.pdf_images.clear()
-    Data.page_frames.clear()
-    Data.page_rendered.clear()
-
-    if Data.doc is None:
+    _drain()
+    _clear_canvas()
+    # check if there's no document is open or canvas doesn't exist yet
+    if Data.doc is None or _canvas is None:
         return
+    # total number of page
+    n_pages  = len(Data.doc)
+    # current canvas width, fall back 800
+    canvas_w = _canvas.winfo_width() or 800
 
-    # create a gray placeholder frame for every page in the document
-    for page_num in range(len(Data.doc)):
-        width, height = get_page_size(page_num)
+    # y track the vertical position of the next page as we stack them
+    y = PAGE_GAP
 
-        # the outer frame acts as the placeholder with a fixed size
-        frame = ctk.CTkFrame(
-            Data.pdf_container, 
-            width=width, 
-            height=height, 
-            fg_color="gray20"
+    for page_num in range(n_pages):
+        r = Data.doc[page_num].rect
+        # scale the dimension by the current zoom level
+        w = int(r.width  * zoom_level)
+        h = int(r.height * zoom_level)
+
+        # center the page horizontally on the canvas
+        x = max(0, (canvas_w - w) // 2)
+
+        # save the position so check_visible_page can find this page later 
+        _page_rects[page_num] = (x, y, w, h)
+
+        # draw a gray rectangle as the placeholder
+        _canvas.create_rectangle(
+            x, y, x + w, y + h,
+            fill="#333333", 
+            outline="#555555",
+            tags=(f"bg_{page_num}",)
         )
-        frame.pack(pady=10)
-        frame.pack_propagate(False)
 
-        # store the frame so we can fill it in later when it becomes visible
-        Data.page_frames[page_num] = frame
-        # track whether this page has been rendered yet
-        Data.page_rendered[page_num] = False
+        # page number label in the centre of the placeholder
+        _canvas.create_text(
+            x + w // 2, y + h // 2,
+            text=str(page_num + 1),
+            fill="#888888",
+            font=("Arial", 14),
+            tags=(f"lbl_{page_num}",)
+        )
 
-    # bind to the canvas configure event to check visible pages whenever the scroll region changes (e.g. when zooming)
-    Data.pdf_container._parent_canvas.bind("<Configure>", lambda e: (
-        Data.pdf_container._parent_canvas.itemconfig("all", width=e.width), 
-        check_visible_pages()
-))
-    # start the scroll polling loop
-    poll_scroll()
+        y += h + PAGE_GAP
 
-# when the user clicks open it calls this function to set up the placeholder frames and start lazy loading the pages as they scroll into view
+    # set the canvas scroll region to the full document height
+    _canvas.configure(scrollregion=(0, 0, canvas_w, y))
+    check_visible_pages()
+
+# run every 100ms on the main thread
 def poll_scroll():
     global _last_scroll_pos
-    # if there is an open document and there are page frames set up, check if the scroll position has changed since the last time we checked, 
-    # and if so check which pages are visible and need to be rendered
-    if Data.doc is not None and Data.page_frames:
-        current_pos = Data.pdf_container._parent_canvas.yview()
-        # if the scroll position has changed since the last time we checked, check which pages are visible and need to be rendered
-        if current_pos != _last_scroll_pos:
-            _last_scroll_pos = current_pos
+    # if there is a document open and page rects to check
+    if Data.doc is not None and _page_rects:
+        # return the current scroll position as a tuple (top_fraction, bottom_fraction)
+        pos = _canvas.yview()
+        # if the scroll position changed since last time, check which page are visible and need rendering
+        if pos != _last_scroll_pos:
+            _last_scroll_pos = pos
             check_visible_pages()
-    # check again after 100ms
+    # schedule the next poll in 100ms
     Data.app.after(100, poll_scroll)
 
-# figure out which pages are currently visible inside the scrollable frame
+# look at every page rect and decide whether to render or unload it based on its position relative to the visible area of the canvas
 def check_visible_pages():
-    if Data.doc is None or not Data.page_frames:
+    if Data.doc is None or not _page_rects or _canvas is None:
         return
-    # canvas = Data.pdf_container._parent_canvas gives us the canvas widget that is used for scrolling inside the CTkScrollableFrame, 
-    # we need it to get the current scroll position and visible area
-    canvas = Data.pdf_container._parent_canvas
-    # we call update_idletasks to make sure the scroll region and widget positions are up to date 
-    canvas.update_idletasks()
 
-    # get the total scrollable content height from the scroll region
-    scroll_region = canvas.cget("scrollregion")
+    # visible range in canvas content pixels
+    sr = _canvas.cget("scrollregion")
     try:
-        # if the scroll region is true we split it into 4 parts and take the 4th part which is the total height, otherwise we just use the canvas height as a fallback
-        if scroll_region:
-            total_height = float(scroll_region.split()[3])
+        # if scrollregion is set it looks like "0 0 800 2400", we want the total height which is the 4th number
+        if sr:
+            total_h = float(sr.split()[3])
         else:
-            total_height = canvas.winfo_height()
+            # else we can get the canvas height in pixels
+            total_h = _canvas.winfo_height()
     except Exception:
-        total_height = canvas.winfo_height()
+        total_h = _canvas.winfo_height()
+    # if we can't get a valid total height, just return
+    if total_h <= 0:
+        return
+    # yview() return the fractions: (0.0, 0.1) means the top 10% of the canvas content is visible, we multiply by total_h to get the pixel position of the visible area
+    t, b = _canvas.yview()
+    vis_top = t * total_h
+    vis_bot = b * total_h
 
-    # get visible range in pixels
-    scroll_top_frac, scroll_bottom_frac = canvas.yview()
-    visible_top = scroll_top_frac * total_height
-    visible_bottom = scroll_bottom_frac * total_height
+    # loop through every page rect and check if it's within the buffer zone around the visible area, 
+    # if so enqueue it for rendering if it's not already, if it's far outside the visible area and currently rendered, unload it to save memory
+    for page_num, (x, y, w, h) in _page_rects.items():
+        page_top = y
+        page_bot = y + h
 
-    # we loop through all the page frames
-    for page_num, frame in Data.page_frames.items():
-        # if this page has already been rendered, skip it
-        if Data.page_rendered[page_num]:
-            continue
+        in_view  = page_bot + BUFFER_PX  >= vis_top and page_top - BUFFER_PX  <= vis_bot
+        far_away = page_bot + UNLOAD_PX  <  vis_top or  page_top - UNLOAD_PX  >  vis_bot
 
-        try:
-            frame.update_idletasks()
-            # winfo_rooty/rootx gives screen coords, so we convert to canvas content coords
-            canvas_root_y = canvas.winfo_rooty()
-            frame_screen_y = frame.winfo_rooty()
-            # offset of the frame within the canvas content (accounts for scroll position)
-            frame_top = frame_screen_y - canvas_root_y + visible_top
-            frame_bottom = frame_top + frame.winfo_height()
-        except Exception:
-            continue
-        
-        # we add a buffer area above and below the visible area so pages just outside the view will also start rendering, 
-        # this makes scrolling smoother because the page is more likely to be ready by the time the user scrolls to it
-        buffer = frame.winfo_height() * BUFFER_PAGES
+        if in_view and page_num not in _image_items:
+            _enqueue(page_num, render_generation)
+        elif far_away and page_num in _image_items:
+            _unload_page(page_num)
 
-        # if any part of the frame is within the visible area plus buffer, 
-        # we start rendering it in a background thread and mark it as rendered so we don't start multiple threads for the same page
-        if frame_bottom + buffer >= visible_top and frame_top - buffer <= visible_bottom:
-            Data.page_rendered[page_num] = True
-            threading.Thread(
-                target=render_page_thread,
-                args=(page_num, render_generation),
-                daemon=True
-            ).start()
+# when a page is far outside the visible area we call this to remove its image from the canvas and delete the reference so it can be garbage collected and free memory
+def _unload_page(page_num):
+    if page_num in _image_items:
+        _canvas.delete(_image_items[page_num])
+        del _image_items[page_num]
+    if page_num in _photo_refs:
+        del _photo_refs[page_num]
 
-# render a single page in the background thread and then display it on the main thread
-def render_page_thread(page_num, my_generation):
-    if Data.doc is None:
+# when the worker thread finish rendering a page it call this to display the image on the canvas, 
+# but only if the generation is still the same (the user might have zoomed or opened another file since then)
+def _show_page(img, page_num, gen):
+    if gen != render_generation or _canvas is None:
+        del img
+        return
+    if page_num not in _page_rects:
+        del img
         return
 
-    try:
-        # if the generation changed it means the user opened a new file or zoomed, so cancel
-        if my_generation != render_generation:
-            return
+    x, y, w, h = _page_rects[page_num]
 
-        page = Data.doc.load_page(page_num)
-        # we use the zoom level to render the page, so when the user zooms it will render with the new zoom level
-        pix = page.get_pixmap(matrix=fitz.Matrix(zoom_level, zoom_level))
-        # convert the pixmap to image using PIL
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        # free the raw pixmap bytes immediately to save memory
-        del pix
+    # use tkinter PhotoImage directly — no CTkImage wrapper needed for canvas
+    photo = ImageTk.PhotoImage(img)
+    del img
 
-        # if the generation is still the same, display the page on the main thread
-        if my_generation == render_generation:
-            Data.app.after(0, lambda img=img, num=page_num, gen=my_generation: display_page(img, num, gen))
-    except Exception as e:
-        print(f"Thread error on page {page_num}: {e}")
+    # keep ref so GC doesn't collect it
+    _photo_refs[page_num] = photo
 
-# display a single rendered page inside its placeholder frame
-def display_page(img, page_num, my_generation):
-    # if the generation changed, don't display anything
-    if my_generation != render_generation:
-        return
+    # hide the page number label
+    _canvas.delete(f"lbl_{page_num}")
 
-    # check the frame still exists
-    if page_num not in Data.page_frames:
-        return
-
-    ctk_img = ctk.CTkImage(
-        light_image=img,
-        dark_image=img,
-        size=(img.width, img.height)
-    )
-    # store the image so it doesn't get garbage collected
-    Data.pdf_images.append(ctk_img)
-
-    # put the image label inside the placeholder frame
-    frame = Data.page_frames[page_num]
-    label = ctk.CTkLabel(
-        frame,
-        image=ctk_img,
-        text="",
-        compound="top"
-    )
-    label.pack()
+    # draw image centred in the placeholder rect
+    item_id = _canvas.create_image(x + w // 2, y + h // 2, image=photo, anchor="center")
+    _image_items[page_num] = item_id

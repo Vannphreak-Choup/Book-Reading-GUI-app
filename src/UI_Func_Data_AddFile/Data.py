@@ -1,27 +1,25 @@
-# store all the shared state here so both ui.py and functionality.py can access it without circular imports
+'''This is a shared state file that is imported by both UI.py and functionality.py'''
 
-# dictionary to store the pdf file name as key and the file path as value
-pdf_files = {}
+# stores every PDF the user has added when they press the "Add PDF" button
+# key = the filename shown in the left panel  (e.g. "mybook.pdf")
+# value = the full file path on disk (e.g. "C:/Users/.../mybook.pdf")
+pdf_files     = {}
 
-# dictionary to store the filename as key and the label widget as value
-file_labels = {}
+# stores the CTkLabel widget for each file shown in the left frame
+# key = filename  (same key as pdf_files so we can look up both together)
+# value = the CTkLabel widget — we keep this so we can highlight it when the user clicks it, and destroy it when the user removes the file
+file_labels   = {} 
 
-# store the currently selected file name
-selected_files = None
+# currently selected filename
+selected_file = None 
 
-# store the open fitz document
-doc = None
+# the fitz Document object for the PDF that is currently open and being viewed
+# fitz.open() returns this so it gives us access to page count, page sizes, and lets us render individual pages to pixel data
+doc           = None # open fitz.Document
 
-# store the CTkImage objects so they don't get garbage collected
-pdf_images = []
-
-# store the widget references so functionality.py can use them without importing ui.py
+# widget refs set by UI.py
+app           = None
+# the CTkCanvas on the right side where we render PDF pages
 pdf_container = None
-file_list = None
-app = None
-
-# store one placeholder frame per page (page number → CTkFrame)
-page_frames = {}
-
-# track which pages have already been rendered (page number → True/False)
-page_rendered = {}
+# the CTkLabel on the left side that shows the filename
+file_list     = None
