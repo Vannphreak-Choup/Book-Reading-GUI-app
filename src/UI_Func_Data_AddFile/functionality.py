@@ -20,6 +20,9 @@ _zoom_after_id = None
 # when the user isn't scrolling
 _last_scroll_pos = None
 
+# tracks the page number
+_current_page = 0
+
 # the vertical gap in pixels between pages on the canvas
 PAGE_GAP = 10
 # render this many pixels above/below the visible area
@@ -111,6 +114,17 @@ def _drain():
             _render_queue.task_done()
         except queue.Empty:
             break
+
+# update the page counter label in the top bar
+def _update_page_label():
+    if Data.page_label is None:
+        return
+    if Data.doc is None:
+        Data.page_label.configure(text="")
+        return
+    total = len(Data.doc)
+    Data.page_label.configure(text=f"Page {_current_page + 1} / {total}")
+
 # function to handle pdf when user click add pdf button
 def handle_add_pdf():
     # return the file path and name as filepath and filename
@@ -182,6 +196,8 @@ def remove_pdf():
         Data.doc = None
     # wipe everything off the canvas
     _clear_canvas()
+    # clear the page label
+    _update_page_label()
 
 # (only called once by the UI.py once it created the canvas widget) it is use to store canvas reference and bind the resize event
 def set_canvas(canvas):
@@ -189,6 +205,36 @@ def set_canvas(canvas):
     _canvas = canvas
     # when the user resize the window, recenter all the page rectangle
     _canvas.bind("<Configure>", lambda e: _on_canvas_resize(e))
+
+# scroll the canvas so that the top of page_num (0-indexed) is in view
+def go_to_page(page_num):
+    if Data.doc is None or not _page_rects:
+        return
+    # clamp to valid range
+    page_num = max(0, min(page_num, len(Data.doc) - 1))
+    if page_num not in _page_rects:
+        return
+
+    sr = _canvas.cget("scrollregion")
+    try:
+        total_h = float(sr.split()[3]) if sr else _canvas.winfo_height()
+    except Exception:
+        total_h = _canvas.winfo_height()
+    if total_h <= 0:
+        return
+
+    _, y, _, _ = _page_rects[page_num]
+    # scroll so the top of the page is at the top of the visible area
+    fraction = y / total_h
+    _canvas.yview_moveto(fraction)
+
+# go to the previous page relative to the current visible page
+def prev_page():
+    go_to_page(_current_page - 1)
+
+# go to the next page relative to the current visible page
+def next_page():
+    go_to_page(_current_page + 1)
 
 # when the window resizes, reposition all page rects to stay centred
 def _on_canvas_resize(e):
@@ -223,13 +269,18 @@ def _clear_canvas():
 
 # redraws all page placeholder retangles on the canvas (called when opening a new pdf or zooming)
 def _rebuild():
-    global render_generation
+    global render_generation, _current_page
     render_generation += 1
     _drain()
     _clear_canvas()
     # check if there's no document is open or canvas doesn't exist yet
     if Data.doc is None or _canvas is None:
         return
+
+    # reset to page 1 whenever we (re)build — scroll to top first
+    _current_page = 0
+    _canvas.yview_moveto(0.0)
+
     # total number of page
     n_pages  = len(Data.doc)
     # current canvas width, fall back 800
@@ -271,6 +322,10 @@ def _rebuild():
 
     # set the canvas scroll region to the full document height
     _canvas.configure(scrollregion=(0, 0, canvas_w, y))
+
+    # update the counter to show Page 1 / N
+    _update_page_label()
+
     check_visible_pages()
 
 # run every 100ms on the main thread
@@ -289,6 +344,8 @@ def poll_scroll():
 
 # look at every page rect and decide whether to render or unload it based on its position relative to the visible area of the canvas
 def check_visible_pages():
+    global _current_page
+
     if Data.doc is None or not _page_rects or _canvas is None:
         return
 
@@ -310,12 +367,19 @@ def check_visible_pages():
     t, b = _canvas.yview()
     vis_top = t * total_h
     vis_bot = b * total_h
+    vis_mid = (vis_top + vis_bot) / 2
+
+    # find which page's centre is closest to the centre of the viewport
+    # this gives the most natural "current page" feel while scrolling
+    best_page = _current_page
+    best_dist = float("inf")
 
     # loop through every page rect and check if it's within the buffer zone around the visible area, 
     # if so enqueue it for rendering if it's not already, if it's far outside the visible area and currently rendered, unload it to save memory
     for page_num, (x, y, w, h) in _page_rects.items():
         page_top = y
         page_bot = y + h
+        page_mid = y + h / 2
 
         in_view  = page_bot + BUFFER_PX  >= vis_top and page_top - BUFFER_PX  <= vis_bot
         far_away = page_bot + UNLOAD_PX  <  vis_top or  page_top - UNLOAD_PX  >  vis_bot
@@ -324,6 +388,17 @@ def check_visible_pages():
             _enqueue(page_num, render_generation)
         elif far_away and page_num in _image_items:
             _unload_page(page_num)
+
+        # track the page whose centre is closest to the viewport centre
+        dist = abs(page_mid - vis_mid)
+        if dist < best_dist:
+            best_dist = dist
+            best_page = page_num
+
+    # update counter only when the page actually changes
+    if best_page != _current_page:
+        _current_page = best_page
+        _update_page_label()
 
 # when a page is far outside the visible area we call this to remove its image from the canvas and delete the reference so it can be garbage collected and free memory
 def _unload_page(page_num):

@@ -23,3 +23,5 @@ app           = None
 pdf_container = None
 # the CTkLabel on the left side that shows the filename
 file_list     = None
+# the CTkLabel in the top-right that shows "Page X / Y"
+page_label    = None

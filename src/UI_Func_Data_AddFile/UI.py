@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from PIL import Image
 from UI_Func_Data_AddFile import Data
-from UI_Func_Data_AddFile.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas
+from UI_Func_Data_AddFile.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page
 
 def build(app):
     Data.app = app
@@ -52,7 +52,9 @@ def build(app):
         font=my_font
     )
     btn_remove.pack(side="left", padx=5)
-    
+
+    # ── right-side controls (packed right-to-left, so last packed = rightmost) ──
+
     # zoom in button
     btn_zoom_in = ctk.CTkButton(
         top_frame, 
@@ -74,6 +76,39 @@ def build(app):
         font=my_font
     )
     btn_zoom_out.pack(side="right", padx=5)
+
+    # separator gap between zoom and page nav
+    ctk.CTkLabel(top_frame, text="", width=10).pack(side="right")
+
+    # next page button  ▶
+    btn_next = ctk.CTkButton(
+        top_frame,
+        text="▶",
+        width=40,
+        command=next_page,
+        font=my_font
+    )
+    btn_next.pack(side="right", padx=2)
+
+    # stored in Data so functionality.py can update it
+    Data.page_label = ctk.CTkLabel(
+        top_frame,
+        text="",
+        font=my_font,
+        width=110,
+        anchor="center"
+    )
+    Data.page_label.pack(side="right", padx=4)
+
+    # prev page button  ◀
+    btn_prev = ctk.CTkButton(
+        top_frame,
+        text="◀",
+        width=40,
+        command=prev_page,
+        font=my_font
+    )
+    btn_prev.pack(side="right", padx=2)
 
     # content frame
     content_frame = ctk.CTkFrame(app)
