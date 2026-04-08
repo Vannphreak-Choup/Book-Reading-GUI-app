@@ -24,7 +24,7 @@ def build(app):
     btn_add = ctk.CTkButton(
         top_frame, 
         text="Add PDF",
-        image=make_icon("assets/icon/add.png"),
+        image=make_icon("src/assets/button_icon/add.png"),
         compound="left", 
         command=handle_add_pdf, 
         font=my_font,
@@ -36,7 +36,7 @@ def build(app):
     btn_url = ctk.CTkButton(
         top_frame,
         text="From URL",
-        image=make_icon("assets/icon/add.png"),
+        image=make_icon("src/assets/button_icon/add.png"),
         compound="left",
         command=handle_add_url,
         font=my_font,
@@ -49,7 +49,7 @@ def build(app):
     btn_open = ctk.CTkButton(
         top_frame, 
         text="Open",
-        image=make_icon("assets/icon/open.png"),
+        image=make_icon("src/assets/button_icon/open.png"),
         compound="left", 
         command=open_pdf, 
         font=my_font,
@@ -62,7 +62,7 @@ def build(app):
     btn_remove = ctk.CTkButton(
         top_frame, 
         text="Remove",
-        image=make_icon("assets/icon/remove.png"),
+        image=make_icon("src/assets/button_icon/remove.png"),
         compound="left", 
         command=remove_pdf, 
         font=my_font,
@@ -75,7 +75,7 @@ def build(app):
     btn_zoom_in = ctk.CTkButton(
         top_frame, 
         text="Zoom",
-        image=make_icon("assets/icon/zoom_in.png"),
+        image=make_icon("src/assets/button_icon/zoom_in.png"),
         compound="left", 
         command=zoom_in, 
         font=my_font,
@@ -88,7 +88,7 @@ def build(app):
     btn_zoom_out = ctk.CTkButton(
         top_frame, 
         text="Zoom",
-        image=make_icon("assets/icon/zoom_out.png"),
+        image=make_icon("src/assets/button_icon/zoom_out.png"),
         compound="left", 
         command=zoom_out, 
         font=my_font,

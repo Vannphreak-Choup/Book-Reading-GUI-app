@@ -21,7 +21,7 @@ app = ctk.CTk()
 # the app title
 app.title("Read da book")
 # the app icon or logo
-app.iconbitmap("assets/icon/book2.ico")
+app.iconbitmap("src/assets/title_icon/book2.ico")
 # the size of the app when not open fullscreen
 app.geometry("1200x600")
 
