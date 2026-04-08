@@ -142,9 +142,11 @@ def build(app):
     left_frame = ctk.CTkFrame(
         content_frame, 
         border_color="gray50", 
-        border_width=3
+        border_width=3,
+        width=200
     )
-    left_frame.pack(side="left", fill="y", padx=5)
+    left_frame.pack(side="left", fill="y", padx=(5, 0))
+    left_frame.propagate(False)
 
     ctk.CTkLabel(
         left_frame, 
@@ -157,7 +159,7 @@ def build(app):
 
     # right frame
     right_frame = ctk.CTkFrame(content_frame)
-    right_frame.pack(side="right", fill="both", expand=True, padx=5)
+    right_frame.pack(side="right", fill="both", expand=True, padx=(0, 5))
 
     scrollbar = ctk.CTkScrollbar(right_frame)
     scrollbar.pack(side="right", fill="y")

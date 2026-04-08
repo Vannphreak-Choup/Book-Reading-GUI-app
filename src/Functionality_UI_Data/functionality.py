@@ -13,6 +13,8 @@ from Functionality_UI_Data import Data
 LIBARY_DIR = None
 # the default zoom level or initial value
 zoom_level = 1.0
+# True if the user has manually zoomed; False means auto-fit on open/resize
+_zoom_manual = False
 # every time a user open a new file or zoom this generation go up by one
 # the worker thread compares its saved generation against this value, so if they are different outdated and thrown away without displaying
 render_generation = 0
@@ -190,7 +192,8 @@ def select_file(filename):
 
 # when user click zoom in it increase the zoom level by 20%
 def zoom_in():
-    global zoom_level, _zoom_after_id
+    global zoom_level, _zoom_after_id, _zoom_manual
+    _zoom_manual = True
     zoom_level += 0.2
     # debounced so rapid clicks only trigger one render
     if _zoom_after_id:
@@ -199,14 +202,28 @@ def zoom_in():
 
 # when user click zoom out it decrease the zoom level by 20% but it doesn't go beyond 40%
 def zoom_out():
-    global zoom_level, _zoom_after_id
+    global zoom_level, _zoom_after_id, _zoom_manual
+    _zoom_manual = True
     zoom_level = max(0.4, zoom_level - 0.2)
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
     _zoom_after_id = Data.app.after(300, _rebuild)
 
+# calculate the zoom level that makes the first page fill the canvas width
+def _fit_zoom_to_canvas():
+    global zoom_level
+    if Data.doc is None or _canvas is None:
+        return
+    canvas_w = _canvas.winfo_width()
+    if canvas_w < 10:
+        canvas_w = 100  # fallback before canvas is fully laid out
+    page_w = Data.doc[0].rect.width
+    if page_w > 0:
+        zoom_level = (canvas_w - 500) / page_w  # 10px padding each side
+
 # when user clicks open it check if there is a file selected
 def open_pdf():
+    global _zoom_manual
     if not Data.selected_file:
         print("No file selected")
         return
@@ -214,6 +231,9 @@ def open_pdf():
     if Data.doc:
         Data.doc.close()
     Data.doc = fitz.open(Data.pdf_files[Data.selected_file])
+    # reset manual zoom so we auto-fit on open
+    _zoom_manual = False
+    _fit_zoom_to_canvas()
     # draw the page placeholders and start lazy rendering 
     _rebuild()
 
@@ -287,12 +307,19 @@ def next_page():
     go_to_page(_current_page + 1)
 
 # when the window resizes, reposition all page rects to stay centred
+# if the user hasn't manually zoomed, re-fit the zoom to the new canvas width
 def _on_canvas_resize(e):
     # if there is no page to loaded yet, return
     if not _page_rects:
         return
     # the new canvas width in pixels
     canvas_w = e.width
+
+    # if auto-fit mode, recalculate zoom and fully rebuild at the new scale
+    if not _zoom_manual and Data.doc is not None:
+        _fit_zoom_to_canvas()
+        _rebuild()
+        return
 
     for page_num, (x, y, w, h) in list(_page_rects.items()):
         # calculate the new x so the page is centered in the canvas
