@@ -1,11 +1,16 @@
+import shutil
+import os
 import threading
 import queue
 import fitz
 from PIL import Image, ImageTk
 import customtkinter as ctk
-from UI_Func_Data_AddFile.AddFile import add_pdf
-from UI_Func_Data_AddFile import Data
+from openDialog.AddFile import add_pdf
+from openDialog.Addurl import open_url_dialog
+from Functionality_UI_Data import Data
 
+# this dir is set by UI.py when the app start, it is where all the pdf files are stored permanently
+LIBARY_DIR = None
 # the default zoom level or initial value
 zoom_level = 1.0
 # every time a user open a new file or zoom this generation go up by one
@@ -125,19 +130,54 @@ def _update_page_label():
     total = len(Data.doc)
     Data.page_label.configure(text=f"Page {_current_page + 1} / {total}")
 
+# Copy src_filepath into LIBRARY_DIR and return the new permanent path
+def _copy_to_library(src_filepath, filename):
+    dest = os.path.join(LIBARY_DIR, filename)
+    # if the abosulute path of the src and dest are the same, it means the file is already in the library so we don't need to copy it, just return the path
+    if os.path.abspath(src_filepath) != os.path.abspath(dest):
+        shutil.copy2(src_filepath, dest)
+    return dest
+
+# if the filename already exist in the library, we add (1), (2) etc before the extension until we find a unique name
+def _unique_filename(filename):
+    if "." in filename:
+        # base is the filename without extension, ext is the extension with dot (e.g "book.pdf" -> base="book", ext="pdf") because we split "."
+        base, ext = filename.rsplit(".", 1)
+        # add the "." back to the extension we split off
+        ext = "." + ext
+    else:
+        # else we just treat the whole filename as base and extension is empty
+        base, ext = filename, ""
+    unique = filename
+    counter = 1
+    # while the unique name is already a key in the pdf_files dict, generate a new name by adding (counter) before the extension and increment the counter
+    while unique in Data.pdf_files:
+        unique = f"{base} ({counter}){ext}"
+        counter += 1
+    return unique
+
+# this is called by both handle_add_pdf and the URL dialog when the user submit a URL, it takes care of copying the file to library, 
+# adding it to the left panel, and registering the click event to select the file when clicked
+def _register_file(filepath, filename):
+    filename = _unique_filename(filename)
+    perm_path = _copy_to_library(filepath, filename)
+    Data.pdf_files[filename] = perm_path
+    label = ctk.CTkLabel(Data.file_list, text=filename)
+    label.pack(anchor="w", padx=5, pady=2)
+    Data.file_labels[filename] = label
+    label.bind("<Button-1>", lambda e, name=filename: select_file(name))
+
 # function to handle pdf when user click add pdf button
 def handle_add_pdf():
     # return the file path and name as filepath and filename
     filepath, filename = add_pdf()
     if not filepath:
         return
-    Data.pdf_files[filename] = filepath
-    label = ctk.CTkLabel(Data.file_list, text=filename)
-    label.pack(anchor="w", padx=5, pady=2)
-    # store the filename as key and the label as value inside file_label
-    Data.file_labels[filename] = label
-    # listen to the left mouse click on the button
-    label.bind("<Button-1>", lambda e, name=filename: select_file(name))
+    _register_file(filepath, filename)
+
+# function to handle url when user click add url button
+def handle_add_url():
+    open_url_dialog(Data.app, _register_file)
 
 # when user clicks a file it saves which file is selected print it
 def select_file(filename):
@@ -182,7 +222,20 @@ def remove_pdf():
     if not Data.selected_file:
         print("No file selected")
         return
-    # if so remove the file from the pdf_file
+    
+    filepath = Data.pdf_files[Data.selected_file]
+
+    if Data.doc:
+        Data.doc.close()
+        Data.doc = None
+    # try to remove the file from the disk
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    except Exception as e:
+        print(f"Error removing file: {e}")
+        
+    # remove the file from the pdf_file
     del Data.pdf_files[Data.selected_file]
     # destroy the label widget in the left frame
     Data.file_labels[Data.selected_file].destroy()
@@ -191,9 +244,6 @@ def remove_pdf():
     # then clear the selected file
     Data.selected_file = None
 
-    if Data.doc:
-        Data.doc.close()
-        Data.doc = None
     # wipe everything off the canvas
     _clear_canvas()
     # clear the page label

@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from PIL import Image
-from UI_Func_Data_AddFile import Data
-from UI_Func_Data_AddFile.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page
+from Functionality_UI_Data import Data
+from Functionality_UI_Data.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url
 
 def build(app):
     Data.app = app
@@ -27,9 +27,23 @@ def build(app):
         image=make_icon("assets/icon/add.png"),
         compound="left", 
         command=handle_add_pdf, 
-        font=my_font
+        font=my_font,
+        fg_color="#a51f1f",
+        hover_color="#145a8a"
     )
     btn_add.pack(side="left", padx=5)
+
+    btn_url = ctk.CTkButton(
+        top_frame,
+        text="From URL",
+        image=make_icon("assets/icon/add.png"),
+        compound="left",
+        command=handle_add_url,
+        font=my_font,
+        fg_color="#a51f1f",
+        hover_color="#145a8a"
+    )
+    btn_url.pack(side="left", padx=5)
     
     # open button
     btn_open = ctk.CTkButton(
@@ -38,7 +52,9 @@ def build(app):
         image=make_icon("assets/icon/open.png"),
         compound="left", 
         command=open_pdf, 
-        font=my_font
+        font=my_font,
+        fg_color="#a51f1f",
+        hover_color="#145a8a"
     )
     btn_open.pack(side="left", padx=5)
     
@@ -49,11 +65,11 @@ def build(app):
         image=make_icon("assets/icon/remove.png"),
         compound="left", 
         command=remove_pdf, 
-        font=my_font
+        font=my_font,
+        fg_color="#a51f1f",
+        hover_color="#145a8a"
     )
     btn_remove.pack(side="left", padx=5)
-
-    # ── right-side controls (packed right-to-left, so last packed = rightmost) ──
 
     # zoom in button
     btn_zoom_in = ctk.CTkButton(
@@ -62,7 +78,9 @@ def build(app):
         image=make_icon("assets/icon/zoom_in.png"),
         compound="left", 
         command=zoom_in, 
-        font=my_font
+        font=my_font,
+        fg_color="#55a51f",
+        hover_color="#145a8a"
     )
     btn_zoom_in.pack(side="right", padx=5)
     
@@ -73,7 +91,9 @@ def build(app):
         image=make_icon("assets/icon/zoom_out.png"),
         compound="left", 
         command=zoom_out, 
-        font=my_font
+        font=my_font,
+            fg_color="#55a51f",
+        hover_color="#145a8a"
     )
     btn_zoom_out.pack(side="right", padx=5)
 
@@ -86,7 +106,9 @@ def build(app):
         text="▶",
         width=40,
         command=next_page,
-        font=my_font
+        font=my_font,
+        fg_color="#a57f1f",
+        hover_color="#145a8a"
     )
     btn_next.pack(side="right", padx=2)
 
@@ -106,7 +128,9 @@ def build(app):
         text="◀",
         width=40,
         command=prev_page,
-        font=my_font
+        font=my_font,
+        fg_color="#a57f1f",
+        hover_color="#145a8a"
     )
     btn_prev.pack(side="right", padx=2)
 
