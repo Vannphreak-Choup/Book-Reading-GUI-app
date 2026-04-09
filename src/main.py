@@ -1,13 +1,15 @@
 import os
+import sys
 from pathlib import Path
 import customtkinter as ctk
+from PIL import Image, ImageTk
 from Functionality_UI_Data import UI, functionality
 from Functionality_UI_Data.functionality import _register_file
 
 # store the library folder in a variable so it can be used across different os
 LIBARY_DIR = Path.home() / "ReadDaBookLibrary"
 # create a dir on the first run and does nothing
-Path.mkdir(LIBARY_DIR, exist_ok=True)
+LIBARY_DIR.mkdir(parents=True, exist_ok=True)
 
 # give functionality.py the resolved path so _copy_to_library know where to save files
 functionality.LIBARY_DIR = LIBARY_DIR
@@ -16,12 +18,36 @@ functionality.LIBARY_DIR = LIBARY_DIR
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
+# the app icon or logo
+def set_app_icon(app):
+    try:
+        # check for window os
+        if sys.platform == "win32":
+            ico_path = "src/assets/title_icon/book2.ico"
+            if not os.path.exists(ico_path):
+                img = Image.open("src/assets/title_icon/book2.png")
+                img.save(ico_path, format="ICO", sizes=[(16, 16), (32, 32), (64, 64)])
+            app.iconbitmap(ico_path)
+        # check for mac os
+        elif sys.platform == "darwin":
+            img = Image.open("src/assets/title_icon/book2.png").resize((64, 64))
+            photo = ImageTk.PhotoImage(img)
+            app.iconphoto(True, photo)
+            app._icon_photo = photo
+        else:
+            # check for linux os
+            img = Image.open("src/assets/title_icon/book2.png").resize((32, 32))
+            photo = ImageTk.PhotoImage(img)
+            app.iconphoto(True, photo)
+            app._icon_photo = photo
+    except Exception as e:
+        print(f"Could not set icon: {e}")
+
 # create a window to open
 app = ctk.CTk()
+set_app_icon(app)
 # the app title
 app.title("Read da book")
-# the app icon or logo
-app.iconbitmap("src/assets/title_icon/book2.ico")
 # the size of the app when not open fullscreen
 app.geometry("1200x600")
 
