@@ -2,7 +2,7 @@ import urllib.request
 import os
 import threading
 import customtkinter as ctk
-from Functionality_UI_Data import functionality
+from utils import functionality
 
 # clean the URL nicely remove the query parameters and get the filename, if the filename doesn't end with .pdf we just name it download.pdf, 
 # and we also remove any characters that are not alphanumeric or ._- to avoid issues with the filesystem
