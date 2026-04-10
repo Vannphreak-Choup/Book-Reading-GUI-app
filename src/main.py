@@ -52,10 +52,10 @@ def load_progress():
         try:
             with open(PROGRESS_FILE, "r") as f:
                 # load the last read pages from the progress file.
-                Data.last_read_pages = json.load(f)
+                Data.last_read_pages.update(json.load(f))
         except Exception:
-            # if there's an error loading the progress (e.g. file is corrupted), just start with an empty progress dict
-            Data.last_read_pages = {}
+            # if there's an error loading the progress (e.g. file is corrupted), just ignore it and start with an empty progress.
+            pass
 
 # save the user's reading progress to a file so it can be loaded on the next startup
 def save_progress():

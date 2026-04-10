@@ -260,6 +260,10 @@ def open_pdf():
     _fit_zoom_to_canvas()
     # draw the page placeholders and start lazy rendering 
     _rebuild()
+    # restore the last read page after a short delay so _rebuild finish first
+    saved_page = Data.last_read_pages.get(Data.selected_file, 0)
+    if saved_page > 0:
+        Data.app.after(150, lambda: go_to_page(saved_page))
 
 # when user clicks remove it checks if there is a file selected
 def remove_pdf():
