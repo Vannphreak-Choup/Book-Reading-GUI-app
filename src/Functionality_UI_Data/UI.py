@@ -37,7 +37,7 @@ def build(app):
     btn_url = ctk.CTkButton(
         top_frame,
         text="From URL",
-        image=make_icon("src/assets/button_icon/add.png"),
+        image=make_icon("src/assets/button_icon/url.png"),
         compound="left",
         command=handle_add_url,
         font=my_font,
