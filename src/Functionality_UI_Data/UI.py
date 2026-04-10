@@ -2,6 +2,7 @@ import customtkinter as ctk
 from PIL import Image
 from Functionality_UI_Data import Data
 from Functionality_UI_Data.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url
+from Functionality_UI_Data import functionality
 
 def build(app):
     Data.app = app
@@ -112,15 +113,30 @@ def build(app):
     )
     btn_next.pack(side="right", padx=2)
 
-    # stored in Data so functionality.py can update it
-    Data.page_label = ctk.CTkLabel(
-        top_frame,
-        text="",
+    # page input frame: [ entry ] / N
+    page_nav_frame = ctk.CTkFrame(top_frame, fg_color="transparent")
+    page_nav_frame.pack(side="right", padx=4)
+
+    # the editable page number entry
+    Data.page_entry = ctk.CTkEntry(
+        page_nav_frame,
         font=my_font,
-        width=110,
-        anchor="center"
+        width=52,
+        justify="center"
     )
-    Data.page_label.pack(side="right", padx=4)
+    Data.page_entry.pack(side="left")
+    Data.page_entry.bind("<Return>", lambda e: functionality.jump_to_entered_page())
+    Data.page_entry.bind("<FocusOut>", lambda e: functionality.jump_to_entered_page())
+
+    # the " / N" total pages label next to the entry
+    Data.page_total_label = ctk.CTkLabel(
+        page_nav_frame,
+        text="/ --",
+        font=my_font,
+        anchor="w",
+        width=50
+    )
+    Data.page_total_label.pack(side="left", padx=(4, 0))
 
     # prev page button  ◀
     btn_prev = ctk.CTkButton(
@@ -142,11 +158,9 @@ def build(app):
     left_frame = ctk.CTkFrame(
         content_frame, 
         border_color="gray50", 
-        border_width=3,
-        width=200
+        border_width=3
     )
-    left_frame.pack(side="left", fill="y", padx=(5, 0))
-    left_frame.propagate(False)
+    left_frame.pack(side="left", fill="y", padx=5)
 
     ctk.CTkLabel(
         left_frame, 
@@ -159,7 +173,7 @@ def build(app):
 
     # right frame
     right_frame = ctk.CTkFrame(content_frame)
-    right_frame.pack(side="right", fill="both", expand=True, padx=(0, 5))
+    right_frame.pack(side="right", fill="both", expand=True, padx=5)
 
     scrollbar = ctk.CTkScrollbar(right_frame)
     scrollbar.pack(side="right", fill="y")

@@ -122,15 +122,39 @@ def _drain():
         except queue.Empty:
             break
 
-# update the page counter label in the top bar
+# update the page entry and total label in the top bar
 def _update_page_label():
-    if Data.page_label is None:
+    if Data.page_entry is None:
         return
     if Data.doc is None:
-        Data.page_label.configure(text="")
+        Data.page_entry.delete(0, "end")
+        Data.page_total_label.configure(text="/ --")
         return
     total = len(Data.doc)
-    Data.page_label.configure(text=f"Page {_current_page + 1} / {total}")
+    # update the entry to show the current page number
+    Data.page_entry.delete(0, "end")
+    Data.page_entry.insert(0, str(_current_page + 1))
+    # update the " / N" label
+    Data.page_total_label.configure(text=f"/ {total}")
+
+# called when the user presses Enter or clicks away from the page entry
+def jump_to_entered_page():
+    if Data.doc is None or Data.page_entry is None:
+        return
+    raw = Data.page_entry.get().strip()
+    total = len(Data.doc)
+    # if empty or invalid, fall back to page 1
+    try:
+        page = int(raw)
+        if page < 1 or page > total:
+            raise ValueError
+    except ValueError:
+        page = 1
+    # update the entry to show the corrected value
+    Data.page_entry.delete(0, "end")
+    Data.page_entry.insert(0, str(page))
+    go_to_page(page - 1)  
+
 
 # Copy src_filepath into LIBRARY_DIR and return the new permanent path
 def _copy_to_library(src_filepath, filename):
@@ -216,10 +240,10 @@ def _fit_zoom_to_canvas():
         return
     canvas_w = _canvas.winfo_width()
     if canvas_w < 10:
-        canvas_w = 100  # fallback before canvas is fully laid out
+        canvas_w = 800  # fallback before canvas is fully laid out
     page_w = Data.doc[0].rect.width
     if page_w > 0:
-        zoom_level = (canvas_w - 500) / page_w  # 10px padding each side
+        zoom_level = (canvas_w - 20) / page_w  # 10px padding each side
 
 # when user clicks open it check if there is a file selected
 def open_pdf():
@@ -354,7 +378,7 @@ def _rebuild():
     if Data.doc is None or _canvas is None:
         return
 
-    # reset to page 1 whenever we (re)build — scroll to top first
+    # reset to page 1 whenever we (re)build then scroll to top first
     _current_page = 0
     _canvas.yview_moveto(0.0)
 
@@ -497,7 +521,6 @@ def _show_page(img, page_num, gen):
 
     x, y, w, h = _page_rects[page_num]
 
-    # use tkinter PhotoImage directly — no CTkImage wrapper needed for canvas
     photo = ImageTk.PhotoImage(img)
     del img
 
