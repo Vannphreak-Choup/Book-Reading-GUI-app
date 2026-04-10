@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from PIL import Image
 from utils import Data
-from utils.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url
+from utils.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url, jump_to_entered_page
 from utils import functionality
 
 def build(app):
@@ -156,20 +156,34 @@ def build(app):
 
     # left frame
     left_frame = ctk.CTkFrame(
-        content_frame, 
-        border_color="gray50", 
-        border_width=3
+        content_frame,
+        fg_color="gray30",       
+        corner_radius=8,
+        width=200
     )
-    left_frame.pack(side="left", fill="y", padx=5)
+    left_frame.pack(side="left", fill="y", padx=(5, 0), pady=0)
+    left_frame.pack_propagate(False)
+
+    # inner frame sits inside with a small margin, creating the border effect
+    inner_frame = ctk.CTkFrame(left_frame, corner_radius=6)
+    inner_frame.pack(fill="both", expand=True, padx=2, pady=2)
+
+    # header row with icon and title
+    header_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
+    header_frame.pack(fill="x", padx=8, pady=(8, 4))
 
     ctk.CTkLabel(
-        left_frame, 
-        text="My Files", 
-        font=my_font
-    ).pack(anchor="w", padx=5, pady=2.5)
+        header_frame,
+        text="📂  My Files",
+        font=my_font,
+        anchor="w"
+    ).pack(side="left")
 
-    Data.file_list = ctk.CTkScrollableFrame(left_frame)
-    Data.file_list.pack(fill="both", expand=True)
+    # thin separator line below the header
+    ctk.CTkFrame(inner_frame, height=2, fg_color="gray40").pack(fill="x", padx=6, pady=(0, 4))
+
+    Data.file_list = ctk.CTkScrollableFrame(inner_frame, fg_color="transparent")
+    Data.file_list.pack(fill="both", expand=True, padx=2, pady=(0, 2))
 
     # right frame
     right_frame = ctk.CTkFrame(content_frame)
