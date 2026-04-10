@@ -174,9 +174,11 @@ def build(app):
 
     ctk.CTkLabel(
         header_frame,
-        text="📂  My Files",
+        text=" My Files",
         font=my_font,
-        anchor="w"
+        anchor="w",
+        image=make_icon("src/assets/button_icon/folder.png"),
+        compound="left"
     ).pack(side="left")
 
     # thin separator line below the header
