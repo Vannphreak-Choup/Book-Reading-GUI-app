@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 import customtkinter as ctk
 from PIL import Image, ImageTk
-from Functionality_UI_Data import UI, functionality, Data
-from Functionality_UI_Data.functionality import _register_file
+from utils import UI, functionality, Data
+from utils.functionality import _register_file
 
 # store the library folder in a variable so it can be used across different os
 LIBARY_DIR = Path.home() / "ReadDaBookLibrary"

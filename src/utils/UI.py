@@ -1,8 +1,8 @@
 import customtkinter as ctk
 from PIL import Image
-from Functionality_UI_Data import Data
-from Functionality_UI_Data.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url
-from Functionality_UI_Data import functionality
+from utils import Data
+from utils.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url
+from utils import functionality
 
 def build(app):
     Data.app = app

@@ -7,7 +7,7 @@ from PIL import Image, ImageTk
 import customtkinter as ctk
 from openDialog.AddFile import add_pdf
 from openDialog.Addurl import open_url_dialog
-from Functionality_UI_Data import Data
+from utils import Data
 
 # this dir is set by UI.py when the app start, it is where all the pdf files are stored permanently
 LIBARY_DIR = None
