@@ -79,7 +79,7 @@ source .venv/bin/activate     # macOS / Linux
 pip install -e .
 
 # Run
-python -m pdfreader.main
+python -m pdfreading.main
 ```
 
 ---
@@ -88,7 +88,7 @@ python -m pdfreader.main
 
 ```
 src/
-└── pdfreader/
+└── pdfreading/
     ├── main.py              # entry point
     ├── assets/              # icons and images
     ├── openDialog/          # file and URL dialogs
