@@ -5,9 +5,9 @@ import queue
 import fitz
 from PIL import Image, ImageTk
 import customtkinter as ctk
-from openDialog.AddFile import add_pdf
-from openDialog.Addurl import open_url_dialog
-from utils import Data
+from ..openDialog.AddFile import add_pdf
+from ..openDialog.Addurl import open_url_dialog
+from . import Data
 
 # this dir is set by UI.py when the app start, it is where all the pdf files are stored permanently
 LIBARY_DIR = None

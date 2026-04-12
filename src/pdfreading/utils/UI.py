@@ -1,8 +1,8 @@
 import customtkinter as ctk
 from PIL import Image
-from utils import Data
-from utils.functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url, jump_to_entered_page
-from utils import functionality
+from . import Data, functionality
+from importlib.resources import files
+from .functionality import handle_add_pdf, open_pdf, remove_pdf, zoom_in, zoom_out, poll_scroll, set_canvas, prev_page, next_page, handle_add_url, jump_to_entered_page
 
 def build(app):
     Data.app = app
@@ -13,7 +13,8 @@ def build(app):
     top_frame = ctk.CTkFrame(app)
     top_frame.pack(fill="x", padx=10, pady=5)
     # helper function to add icons to the buttons
-    def make_icon(path):
+    def make_icon(filename):
+        path = files("pdfreader.assets.button_icon").joinpath(filename)
         img = Image.open(path)
         return ctk.CTkImage(
             light_image=img, 
@@ -25,7 +26,7 @@ def build(app):
     btn_add = ctk.CTkButton(
         top_frame, 
         text="Add PDF",
-        image=make_icon("src/assets/button_icon/add.png"),
+        image=make_icon("add.png"),
         compound="left", 
         command=handle_add_pdf, 
         font=my_font,
@@ -37,7 +38,7 @@ def build(app):
     btn_url = ctk.CTkButton(
         top_frame,
         text="From URL",
-        image=make_icon("src/assets/button_icon/url.png"),
+        image=make_icon("url.png"),
         compound="left",
         command=handle_add_url,
         font=my_font,
@@ -50,7 +51,7 @@ def build(app):
     btn_open = ctk.CTkButton(
         top_frame, 
         text="Open",
-        image=make_icon("src/assets/button_icon/open.png"),
+        image=make_icon("open.png"),
         compound="left", 
         command=open_pdf, 
         font=my_font,
@@ -63,7 +64,7 @@ def build(app):
     btn_remove = ctk.CTkButton(
         top_frame, 
         text="Remove",
-        image=make_icon("src/assets/button_icon/remove.png"),
+        image=make_icon("remove.png"),
         compound="left", 
         command=remove_pdf, 
         font=my_font,
@@ -76,7 +77,7 @@ def build(app):
     btn_zoom_in = ctk.CTkButton(
         top_frame, 
         text="Zoom",
-        image=make_icon("src/assets/button_icon/zoom_in.png"),
+        image=make_icon("zoom_in.png"),
         compound="left", 
         command=zoom_in, 
         font=my_font,
@@ -89,7 +90,7 @@ def build(app):
     btn_zoom_out = ctk.CTkButton(
         top_frame, 
         text="Zoom",
-        image=make_icon("src/assets/button_icon/zoom_out.png"),
+        image=make_icon("zoom_out.png"),
         compound="left", 
         command=zoom_out, 
         font=my_font,
@@ -177,7 +178,7 @@ def build(app):
         text=" My Files",
         font=my_font,
         anchor="w",
-        image=make_icon("src/assets/button_icon/folder.png"),
+        image=make_icon("folder.png"),
         compound="left"
     ).pack(side="left")
 
