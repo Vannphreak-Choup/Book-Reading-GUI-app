@@ -67,8 +67,8 @@ Dependencies are installed automatically:
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/pdf-reader.git
-cd pdf-reader
+git clone https://github.com/Vannphreak-Choup/Book-Reading-GUI-app.git
+cd Book-Reading-GUI-app
 
 # Create and activate a virtual environment
 python -m venv .venv
@@ -95,9 +95,10 @@ src/
     │   ├── AddFile.py
     │   └── Addurl.py
     └── utils/
-        ├── Data.py          # shared app state
-        ├── UI.py            # UI layout
-        └── functionality.py # core logic
+    |   ├── Data.py          # shared app state
+    |   ├── UI.py            # UI layout
+    |   └── functionality.py # core logic
+    └── main.py
 ```
 
 ---
