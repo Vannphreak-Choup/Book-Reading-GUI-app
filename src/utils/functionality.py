@@ -222,7 +222,7 @@ def zoom_in():
     # debounced so rapid clicks only trigger one render
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
-    _zoom_after_id = Data.app.after(300, _rebuild)
+    _zoom_after_id = Data.app.after(300, lambda: _rebuild(restore_page=True))
 
 # when user click zoom out it decrease the zoom level by 20% but it doesn't go beyond 40%
 def zoom_out():
@@ -231,7 +231,7 @@ def zoom_out():
     zoom_level = max(0.4, zoom_level - 0.2)
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
-    _zoom_after_id = Data.app.after(300, _rebuild)
+    _zoom_after_id = Data.app.after(300, lambda: _rebuild(restore_page=True))
 
 # calculate the zoom level that makes the first page fill the canvas width
 def _fit_zoom_to_canvas():
@@ -346,7 +346,7 @@ def _on_canvas_resize(e):
     # if auto-fit mode, recalculate zoom and fully rebuild at the new scale
     if not _zoom_manual and Data.doc is not None:
         _fit_zoom_to_canvas()
-        _rebuild()
+        _rebuild(restore_page=True)
         return
 
     for page_num, (x, y, w, h) in list(_page_rects.items()):
@@ -373,16 +373,22 @@ def _clear_canvas():
     _photo_refs.clear()
 
 # redraws all page placeholder retangles on the canvas (called when opening a new pdf or zooming)
-def _rebuild():
+def _rebuild(restore_page=False):
     global render_generation, _current_page
     render_generation += 1
     _drain()
+    # save current page before clearing so we can restore it after zoom
+    if restore_page:
+        saved_page = _current_page
+    else:
+        saved_page = 0
+        
     _clear_canvas()
     # check if there's no document is open or canvas doesn't exist yet
     if Data.doc is None or _canvas is None:
         return
 
-    # reset to page 1 whenever we (re)build then scroll to top first
+    # reset to page 1 on new open, or restore current page on zoom
     _current_page = 0
     _canvas.yview_moveto(0.0)
 
@@ -430,6 +436,10 @@ def _rebuild():
 
     # update the counter to show Page 1 / N
     _update_page_label()
+
+    # if restoring after zoom, scroll back to the page the user was on
+    if restore_page and saved_page > 0:
+        go_to_page(saved_page)
 
     check_visible_pages()
 
