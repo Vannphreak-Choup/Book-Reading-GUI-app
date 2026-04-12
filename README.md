@@ -45,6 +45,22 @@ Dependencies are installed automatically:
 - [Pillow](https://python-pillow.org/) — image handling
 - [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) — modern UI
 
+> **Linux / macOS users:** Tkinter does not come pre-installed on all systems.
+> If you get a `No module named 'tkinter'` error, install it manually:
+>
+> **Ubuntu / Debian:**
+> ```bash
+> sudo apt install python3-tk
+> ```
+> **Fedora:**
+> ```bash
+> sudo dnf install python3-tkinter
+> ```
+> **macOS (Homebrew):**
+> ```bash
+> brew install python-tk
+> ```
+
 ---
 
 ## Run from source
