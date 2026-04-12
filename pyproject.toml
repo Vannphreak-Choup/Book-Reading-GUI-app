@@ -4,8 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pdfreading-app"
-version = "0.1.0"
+version = "0.1.2"
 description = "A PDF reader desktop app"
+readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
     "pillow",
@@ -18,3 +19,6 @@ pdfreading-app = "pdfreading.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdfreading"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"src/pdfreading/assets" = "pdfreading/assets"

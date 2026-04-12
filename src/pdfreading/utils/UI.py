@@ -14,7 +14,7 @@ def build(app):
     top_frame.pack(fill="x", padx=10, pady=5)
     # helper function to add icons to the buttons
     def make_icon(filename):
-        path = files("pdfreader.assets.button_icon").joinpath(filename)
+        path = files("pdfreading.assets.button_icon").joinpath(filename)
         img = Image.open(path)
         return ctk.CTkImage(
             light_image=img, 

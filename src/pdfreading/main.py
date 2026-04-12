@@ -22,20 +22,20 @@ def set_app_icon(app):
         if sys.platform == "win32":
             ico_path = LIBARY_DIR / "book2.ico"
             if not ico_path.exists():
-                src = files("pdfreader.assets.title_icon").joinpath("book2.png")
+                src = files("pdfreading.assets.title_icon").joinpath("book2.png")
                 img = Image.open(src)
                 img.save(ico_path, format="ICO", sizes=[(16, 16), (32, 32), (64, 64)])
             app.iconbitmap(str(ico_path))
         # macOS
         elif sys.platform == "darwin":
-            src = files("pdfreader.assets.title_icon").joinpath("book2.png")
+            src = files("pdfreading.assets.title_icon").joinpath("book2.png")
             img = Image.open(src).resize((64, 64))
             photo = ImageTk.PhotoImage(img)
             app.iconphoto(True, photo)
             app._icon_photo = photo
         else:
             # linux and other OSes
-            src = files("pdfreader.assets.title_icon").joinpath("book2.png")
+            src = files("pdfreading.assets.title_icon").joinpath("book2.png")
             img = Image.open(src).resize((32, 32))
             photo = ImageTk.PhotoImage(img)
             app.iconphoto(True, photo)
