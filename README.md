@@ -95,10 +95,9 @@ src/
     │   ├── AddFile.py
     │   └── Addurl.py
     └── utils/
-    |   ├── Data.py          # shared app state
-    |   ├── UI.py            # UI layout
-    |   └── functionality.py # core logic
-    └── main.py
+        ├── Data.py          # shared app state
+        ├── UI.py            # UI layout
+        └── functionality.py # core logic
 ```
 
 ---

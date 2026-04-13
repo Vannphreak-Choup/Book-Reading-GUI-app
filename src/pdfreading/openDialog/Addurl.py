@@ -1,5 +1,8 @@
 import urllib.request
 import os
+import sys
+from importlib.resources import files as res_files
+from PIL import Image, ImageTk
 import threading
 import customtkinter as ctk
 from ..utils import functionality
@@ -26,6 +29,19 @@ def open_url_dialog(app, on_success):
     dialog.resizable(False, False)
     dialog.transient(app)
     dialog.grab_set()
+    # set the dialog icon after a short delay to ensure the window has been created
+    def _set_dialog_icon():
+        try:
+            if sys.platform == "win32":
+                icon_path = res_files("pdfreading.assets.title_icon").joinpath("book2.ico")
+                dialog.iconbitmap(str(icon_path))
+            else:
+                icon_path = res_files("pdfreading.assets.title_icon").joinpath("book2.png")
+                dialog.iconphoto(False, ImageTk.PhotoImage(Image.open(icon_path)))
+        except Exception as e:
+            print(f"Could not set dialog icon: {e}")
+
+    dialog.after(210, _set_dialog_icon)
 
     my_font    = ctk.CTkFont(family="Arial", size=13, weight="bold")
     small_font = ctk.CTkFont(family="Arial", size=11)
@@ -145,5 +161,8 @@ def open_url_dialog(app, on_success):
         command=dialog.destroy
     )
     btn_cancel.pack(side="left", padx=8)
+    # focus_force() force the window to take focus, and lift() brings it to the front of the window stack
+    dialog.after(100, lambda: dialog.focus_force())
+    dialog.after(150, lambda: dialog.lift())
     # allow pressing Enter to trigger the download
     dialog.bind("<Return>", lambda e: _start())
