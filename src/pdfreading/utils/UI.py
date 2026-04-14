@@ -31,7 +31,7 @@ def build(app):
         command=handle_add_pdf, 
         font=my_font,
         fg_color="#a51f1f",
-        hover_color="#145a8a"
+        hover_color="#4ba03e"
     )
     btn_add.pack(side="left", padx=5)
 
@@ -43,7 +43,7 @@ def build(app):
         command=handle_add_url,
         font=my_font,
         fg_color="#a51f1f",
-        hover_color="#145a8a"
+        hover_color="#4ba03e"
     )
     btn_url.pack(side="left", padx=5)
     
@@ -56,7 +56,7 @@ def build(app):
         command=open_pdf, 
         font=my_font,
         fg_color="#a51f1f",
-        hover_color="#145a8a"
+        hover_color="#4ba03e"
     )
     btn_open.pack(side="left", padx=5)
     
@@ -69,7 +69,7 @@ def build(app):
         command=remove_pdf, 
         font=my_font,
         fg_color="#a51f1f",
-        hover_color="#145a8a"
+        hover_color="#4ba03e"
     )
     btn_remove.pack(side="left", padx=5)
 
@@ -110,7 +110,7 @@ def build(app):
         command=next_page,
         font=my_font,
         fg_color="#a57f1f",
-        hover_color="#145a8a"
+        hover_color="#7e148a"
     )
     btn_next.pack(side="right", padx=2)
 
@@ -147,7 +147,7 @@ def build(app):
         command=prev_page,
         font=my_font,
         fg_color="#a57f1f",
-        hover_color="#145a8a"
+        hover_color="#7e148a"
     )
     btn_prev.pack(side="right", padx=2)
 

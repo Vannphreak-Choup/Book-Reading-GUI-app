@@ -26,6 +26,12 @@ def open_url_dialog(app, on_success):
     dialog = ctk.CTkToplevel(app)
     dialog.title("Load PDF from URL")
     dialog.geometry("480x220")
+    # center the dialog over the main app window
+    dialog.update_idletasks()
+    x = app.winfo_x() + (app.winfo_width() // 2) - (480 // 2)
+    y = app.winfo_y() + (app.winfo_height() // 2) - (220 // 2)
+    dialog.geometry(f"480x220+{x}+{y}")
+
     dialog.resizable(False, False)
     dialog.transient(app)
     # make the dialog modal by grabbing all events and focusing it
@@ -44,7 +50,7 @@ def open_url_dialog(app, on_success):
                 icon_path = files("pdfreading.assets.title_icon").joinpath("book2.ico")
                 dialog.iconbitmap(str(icon_path))
             else:
-                icon_path = res_files("pdfreading.assets.title_icon").joinpath("book2.png")
+                icon_path = files("pdfreading.assets.title_icon").joinpath("book2.png")
                 dialog.iconphoto(False, ImageTk.PhotoImage(Image.open(icon_path)))
         except Exception as e:
             print(f"Could not set dialog icon: {e}")
@@ -99,11 +105,35 @@ def open_url_dialog(app, on_success):
 
         filename = _sanitize_filename(url)
         filepath = os.path.join(functionality.LIBARY_DIR, filename)
-        # try downloading the file from the URL to a temp location
+        # try requesting the file
         try:
-            urllib.request.urlretrieve(url, filepath)
+            # user-agent is set to mimic a real browser to avoid some servers blocking the request
+            # the referer header is set to google.com to avoid some servers blocking the request due to missing referer or blocking requests from certain domains
+            # the accept header is set to application/pdf to indicate that we only want PDF files, some servers might use this to determine whether to allow the download or not
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                    "referer": "https://www.google.com/",
+                    "Accept": "application/pdf,*/*",
+                }
+            )
+            # open the URL
+            with urllib.request.urlopen(req) as response:
+                with open(filepath, "wb") as f:
+                    f.write(response.read())
         except Exception as e:
-            dialog.after(0, lambda err=e: _set_status(f"Download failed: {err}", "red"))
+            err_msg = str(e)
+            if "403" in err_msg:
+                msg = "Access denied (403). The server block direct downloads. \nTry downloading the file manually and use 'Add PDF' instead."
+            elif "404" in err_msg:
+                msg = "File not found (404). \nPlease check the URL and try again."
+            elif "timeout" in err_msg.lower():
+                msg = "Connection timed out. \nPlease check your internet connection and try again."
+            else:
+                msg = f"Download failed: {err_msg}"
+
+            dialog.after(0, lambda m=msg: _set_status(m, "red"))
             dialog.after(0, _re_enable)
             return
 
