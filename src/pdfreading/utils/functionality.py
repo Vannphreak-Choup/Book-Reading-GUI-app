@@ -33,9 +33,9 @@ _current_page = 0
 # the vertical gap in pixels between pages on the canvas
 PAGE_GAP = 10
 # render this many pixels above/below the visible area
-BUFFER_PX = 600  
+BUFFER_PX = 300 
 # unload pages this far outside the visible area
-UNLOAD_PX = 1200 
+UNLOAD_PX = 600 
 
 # canvas widget stored here so the whole module can reach it
 _canvas = None
