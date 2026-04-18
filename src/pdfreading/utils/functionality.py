@@ -346,7 +346,7 @@ def _on_canvas_resize(e):
     # if auto-fit mode, recalculate zoom and fully rebuild at the new scale
     if not _zoom_manual and Data.doc is not None:
         _fit_zoom_to_canvas()
-        _rebuild()
+        _rebuild(restore_page=True)
         return
 
     for page_num, (x, y, w, h) in list(_page_rects.items()):
@@ -439,7 +439,7 @@ def _rebuild(restore_page=False):
     _update_page_label()
 
     check_visible_pages()
-    if restore_page and saved_page:
+    if restore_page and saved_page > 0:
         go_to_page(saved_page)
 
 # run every 100ms on the main thread
