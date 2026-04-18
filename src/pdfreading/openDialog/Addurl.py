@@ -21,86 +21,113 @@ def _sanitize_filename(url: str) -> str:
     name = new_name
     return name or "download.pdf"
 
-# Opens a modal dialog asking the user for a PDF URL.
-def open_url_dialog(app, on_success):
-    dialog = ctk.CTkToplevel(app)
-    dialog.title("Load PDF from URL")
-    dialog.geometry("480x220")
-    # center the dialog over the main app window
-    dialog.update_idletasks()
-    x = app.winfo_x() + (app.winfo_width() // 2) - (480 // 2)
-    y = app.winfo_y() + (app.winfo_height() // 2) - (220 // 2)
-    dialog.geometry(f"480x220+{x}+{y}")
+class URLDialog:
+    def __init__(self, app, on_success):
+        self.app = app
+        self.on_success = on_success
+        self._build()
+    # Opens a modal dialog asking the user for a PDF URL.
+    def _build(self):
+        self.dialog = ctk.CTkToplevel(self.app)
+        self.dialog.title("Load PDF from URL")
+        self.dialog.geometry("480x220")
 
-    dialog.resizable(False, False)
-    dialog.transient(app)
-    # make the dialog modal by grabbing all events and focusing it
-    def _after_init():
-        try:
-            dialog.grab_set()
-        except Exception as e:
-            print(f"could not grab: {e}")
-        dialog.focus_force()
-        dialog.lift()
-    
-    # set the dialog icon after a short delay to ensure the window has been created
-    def _set_dialog_icon():
-        try:
-            if sys.platform == "win32":
-                icon_path = files("pdfreading.assets.title_icon").joinpath("book2.ico")
-                dialog.iconbitmap(str(icon_path))
-            else:
-                icon_path = files("pdfreading.assets.title_icon").joinpath("book2.png")
-                dialog.iconphoto(False, ImageTk.PhotoImage(Image.open(icon_path)))
-        except Exception as e:
-            print(f"Could not set dialog icon: {e}")
+        # center the dialog over the main app window
+        self.dialog.update_idletasks()
+        x = self.app.winfo_x() + (self.app.winfo_width() // 2) - (480 // 2)
+        y = self.app.winfo_y() + (self.app.winfo_height() // 2) - (220 // 2)
+        self.dialog.geometry(f"480x220+{x}+{y}")
+        self.dialog.resizable(False, False)
+        self.dialog.transient(self.app)
 
-    my_font    = ctk.CTkFont(family="Arial", size=13, weight="bold")
-    small_font = ctk.CTkFont(family="Arial", size=11)
-    # the title and entry box for the URL
-    ctk.CTkLabel(dialog, text="PDF URL:", font=my_font).pack(
+        my_font    = ctk.CTkFont(family="Arial", size=13, weight="bold")
+        small_font = ctk.CTkFont(family="Arial", size=11)
+        # the title and entry box for the URL
+        ctk.CTkLabel(self.dialog, text="PDF URL:", font=my_font).pack(
         anchor="w", padx=20, pady=(20, 2)
-    )
-    url_entry = ctk.CTkEntry(
-        dialog, 
+        )
+        url_entry = ctk.CTkEntry(
+        self.dialog, 
         width=440, 
         font=small_font,
         placeholder_text="https://example.com/file.pdf"
-    )
-    url_entry.pack(padx=20)
+        )
+        url_entry.pack(padx=20)
     
-    status_label = ctk.CTkLabel(dialog, text="", font=small_font, text_color="gray70")
-    status_label.pack(pady=(8, 0))
-    # the progress bar
-    progress = ctk.CTkProgressBar(dialog, width=440, mode="indeterminate")
+        status_label = ctk.CTkLabel(self.dialog, text="", font=small_font, text_color="gray70")
+        status_label.pack(pady=(8, 0))
+        # the progress bar
+        self.progress = ctk.CTkProgressBar(self.dialog, width=440, mode="indeterminate")
 
-    btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
-    btn_frame.pack(pady=12)
+        btn_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
+        btn_frame.pack(pady=12)
+
+        btn_download = ctk.CTkButton(
+        btn_frame, 
+        text="Download",
+        font=my_font, 
+        command=self._start
+    )
+        btn_download.pack(side="left", padx=8)
+
+        btn_cancel = ctk.CTkButton(
+            btn_frame, 
+            text="Cancel", 
+            font=my_font,
+            fg_color="gray40", 
+            hover_color="gray30",
+            command=self.dialog.destroy
+        )
+        btn_cancel.pack(side="left", padx=8)
+        self.dialog.after(210, self._after_init)
+        self.dialog.after(210, self._set_dialog_icon)
+        self.dialog.bind("<Return>", lambda e: self._start())
+
+    # make the dialog modal by grabbing all events and focusing it
+    def _after_init(self):
+        try:
+            self.dialog.grab_set()
+        except Exception as e:
+            print(f"could not grab: {e}")
+        self.dialog.focus_force()
+        self.dialog.lift()
+    
+    # set the dialog icon after a short delay to ensure the window has been created
+    def _set_dialog_icon(self):
+        try:
+            if sys.platform == "win32":
+                icon_path = files("pdfreading.assets.title_icon").joinpath("book2.ico")
+                self.dialog.iconbitmap(str(icon_path))
+            else:
+                icon_path = files("pdfreading.assets.title_icon").joinpath("book2.png")
+                self.dialog.iconphoto(False, ImageTk.PhotoImage(Image.open(icon_path)))
+        except Exception as e:
+            print(f"Could not set dialog icon: {e}")
 
     # helper function to update the status label and color
-    def _set_status(msg, color="gray70"):
-        status_label.configure(text=msg, text_color=color)
+    def _set_status(self, msg, color="gray70"):
+        self.status_label.configure(text=msg, text_color=color)
 
     # helper function to re-enable the UI elements after a download attempt (whether successful or not)
-    def _re_enable():
-        progress.stop()
-        progress.pack_forget()
-        btn_download.configure(state="normal")
-        btn_cancel.configure(state="normal")
-        url_entry.configure(state="normal")
+    def _re_enable(self):
+        self.progress.stop()
+        self.progress.pack_forget()
+        self.btn_download.configure(state="normal")
+        self.btn_cancel.configure(state="normal")
+        self.url_entry.configure(state="normal")
 
     """Background thread: download → validate → callback."""
-    def _do_download():
-        url = url_entry.get().strip()
+    def _do_download(self):
+        url = self.url_entry.get().strip()
         # if the URL field is empty, show an error and re-enable the UI so they can try again
         if not url:
-            dialog.after(0, lambda: _set_status("Please enter a URL.", "red"))
-            dialog.after(0, _re_enable)
+            self.dialog.after(0, lambda: self._set_status("Please enter a URL.", "red"))
+            self.dialog.after(0, self._re_enable)
             return
         # if the URL doesn't start with http:// or https://, show an error and re-enable the UI so they can try again
         if not url.startswith(("http://", "https://")):
-            dialog.after(0, lambda: _set_status("URL must start with http:// or https://", "red"))
-            dialog.after(0, _re_enable)
+            self.dialog.after(0, lambda: self._set_status("URL must start with http:// or https://", "red"))
+            self.dialog.after(0, self._re_enable)
             return
 
         filename = _sanitize_filename(url)
@@ -133,8 +160,8 @@ def open_url_dialog(app, on_success):
             else:
                 msg = f"Download failed: {err_msg}"
 
-            dialog.after(0, lambda m=msg: _set_status(m, "red"))
-            dialog.after(0, _re_enable)
+            self.dialog.after(0, lambda m=msg: self._set_status(m, "red"))
+            self.dialog.after(0, self._re_enable)
             return
 
         # open the downloaded file and check if it has a valid PDF header, if not it's not a valid PDF so we delete the file
@@ -144,59 +171,42 @@ def open_url_dialog(app, on_success):
                 header = f.read(5)
             if header != b"%PDF-":
                 os.remove(filepath)
-                dialog.after(0, lambda: _set_status("That URL did not return a PDF file.", "red"))
-                dialog.after(0, _re_enable)
+                self.dialog.after(0, lambda: self._set_status("That URL did not return a PDF file.", "red"))
+                self.dialog.after(0, self._re_enable)
                 return
         except Exception as e:
-            dialog.after(0, lambda err=e: _set_status(f"Error reading file: {err}", "red"))
-            dialog.after(0, _re_enable)
+            self.dialog.after(0, lambda err=e: self._set_status(f"Error reading file: {err}", "red"))
+            self.dialog.after(0, self._re_enable)
             return
 
         # schedule _finish to run on the main thread as soon as it is free
-        dialog.after(0, lambda fp=filepath, fn=filename: _finish(fp, fn))
+        self.dialog.after(0, lambda fp=filepath, fn=filename: self._finish(fp, fn))
 
     # helper function to clean up the dialog and call the on_success callback with the downloaded file path and name
-    def _finish(filepath, filename):
+    def _finish(self, filepath, filename):
         # stop the progress bar
-        progress.stop()
+        self.progress.stop()
         # hide it
-        progress.pack_forget()
+        self.progress.pack_forget()
         # grab_release and destroy the dialog before calling on_success to avoid any potential issues if on_success takes a long time to execute or opens another dialog
-        dialog.grab_release()
-        dialog.destroy()
-        on_success(filepath, filename)   
+        self.dialog.grab_release()
+        self.dialog.destroy()
+        self.on_success(filepath, filename)
 
     # helper function to start the download thread and update the UI accordingly
-    def _start():
-        url = url_entry.get().strip()
+    def _start(self):
+        url = self.url_entry.get().strip()
         if not url:
-            _set_status("Please enter a URL.", "red")
+            self._set_status("Please enter a URL.", "red")
             return
-        btn_download.configure(state="disabled")
-        btn_cancel.configure(state="disabled")
-        url_entry.configure(state="disabled")
-        progress.pack(padx=20, pady=(0, 4))
-        progress.start()
-        _set_status("Downloading…", "gray70")
-        threading.Thread(target=_do_download, daemon=True).start()
+        self.btn_download.configure(state="disabled")
+        self.btn_cancel.configure(state="disabled")
+        self.url_entry.configure(state="disabled")
+        self.progress.pack(padx=20, pady=(0, 4))
+        self.progress.start()
+        self._set_status("Downloading…", "gray70")
+        threading.Thread(target=self._do_download, daemon=True).start()
 
-    btn_download = ctk.CTkButton(
-        btn_frame, 
-        text="Download",
-        font=my_font, 
-        command=_start
-    )
-    btn_download.pack(side="left", padx=8)
-
-    btn_cancel = ctk.CTkButton(
-        btn_frame, 
-        text="Cancel", 
-        font=my_font,
-        fg_color="gray40", 
-        hover_color="gray30",
-        command=dialog.destroy
-    )
-    btn_cancel.pack(side="left", padx=8)
-    dialog.after(210, _after_init)
-    dialog.after(210, _set_dialog_icon)
-    dialog.bind("<Return>", lambda e: _start())
+# this is where functionality called to use the URL dialog
+def open_url_dialog(app, on_success):
+    URLDialog(app, on_success)
