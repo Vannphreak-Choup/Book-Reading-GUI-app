@@ -43,42 +43,45 @@ class URLDialog:
         my_font    = ctk.CTkFont(family="Arial", size=13, weight="bold")
         small_font = ctk.CTkFont(family="Arial", size=11)
         # the title and entry box for the URL
-        ctk.CTkLabel(self.dialog, text="PDF URL:", font=my_font).pack(
-        anchor="w", padx=20, pady=(20, 2)
+        ctk.CTkLabel(self.dialog, text="PDF URL:", font=my_font).pack(anchor="w", padx=20, pady=(20, 2))
+        self.url_entry = ctk.CTkEntry(
+            self.dialog, 
+            width=440, 
+            font=small_font,
+            placeholder_text="https://example.com/file.pdf"
         )
-        url_entry = ctk.CTkEntry(
-        self.dialog, 
-        width=440, 
-        font=small_font,
-        placeholder_text="https://example.com/file.pdf"
-        )
-        url_entry.pack(padx=20)
+        self.url_entry.pack(padx=20)
     
-        status_label = ctk.CTkLabel(self.dialog, text="", font=small_font, text_color="gray70")
-        status_label.pack(pady=(8, 0))
+        self.status_label = ctk.CTkLabel(
+            self.dialog, 
+            text="", 
+            font=small_font, 
+            text_color="gray70"
+        )
+        self.status_label.pack(pady=(8, 0))
         # the progress bar
         self.progress = ctk.CTkProgressBar(self.dialog, width=440, mode="indeterminate")
 
-        btn_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
-        btn_frame.pack(pady=12)
+        self.btn_frame = ctk.CTkFrame(self.dialog, fg_color="transparent")
+        self.btn_frame.pack(pady=12)
 
-        btn_download = ctk.CTkButton(
-        btn_frame, 
+        self.btn_download = ctk.CTkButton(
+        self.btn_frame, 
         text="Download",
         font=my_font, 
         command=self._start
-    )
-        btn_download.pack(side="left", padx=8)
+        )
+        self.btn_download.pack(side="left", padx=8)
 
-        btn_cancel = ctk.CTkButton(
-            btn_frame, 
+        self.btn_cancel = ctk.CTkButton(
+            self.btn_frame, 
             text="Cancel", 
             font=my_font,
             fg_color="gray40", 
             hover_color="gray30",
             command=self.dialog.destroy
         )
-        btn_cancel.pack(side="left", padx=8)
+        self.btn_cancel.pack(side="left", padx=8)
         self.dialog.after(210, self._after_init)
         self.dialog.after(210, self._set_dialog_icon)
         self.dialog.bind("<Return>", lambda e: self._start())
