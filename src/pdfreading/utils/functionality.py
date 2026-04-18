@@ -222,7 +222,7 @@ def zoom_in():
     # debounced so rapid clicks only trigger one render
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
-    _zoom_after_id = Data.app.after(300, _rebuild)
+    _zoom_after_id = Data.app.after(300, lambda: _rebuild(restore_page=True))
 
 # when user click zoom out it decrease the zoom level by 20% but it doesn't go beyond 40%
 def zoom_out():
@@ -231,7 +231,7 @@ def zoom_out():
     zoom_level = max(0.4, zoom_level - 0.2)
     if _zoom_after_id:
         Data.app.after_cancel(_zoom_after_id)
-    _zoom_after_id = Data.app.after(300, _rebuild)
+    _zoom_after_id = Data.app.after(300, lambda: _rebuild(restore_page=True))
 
 # calculate the zoom level that makes the first page fill the canvas width
 def _fit_zoom_to_canvas():
@@ -373,10 +373,15 @@ def _clear_canvas():
     _photo_refs.clear()
 
 # redraws all page placeholder retangles on the canvas (called when opening a new pdf or zooming)
-def _rebuild():
+def _rebuild(restore_page=False):
     global render_generation, _current_page
     render_generation += 1
     _drain()
+    # if restore page is true the saved page become the current page, otherwise we reset to page 1
+    if restore_page:
+        saved_page = _current_page
+    else:
+        saved_page = 0
     _clear_canvas()
     # check if there's no document is open or canvas doesn't exist yet
     if Data.doc is None or _canvas is None:
@@ -384,7 +389,9 @@ def _rebuild():
 
     # reset to page 1 whenever we (re)build then scroll to top first
     _current_page = 0
-    _canvas.yview_moveto(0.0)
+    
+    if not restore_page:
+        _canvas.yview_moveto(0.0)
 
     # total number of page
     n_pages  = len(Data.doc)
@@ -432,6 +439,8 @@ def _rebuild():
     _update_page_label()
 
     check_visible_pages()
+    if restore_page and saved_page:
+        go_to_page(saved_page)
 
 # run every 100ms on the main thread
 def poll_scroll():
