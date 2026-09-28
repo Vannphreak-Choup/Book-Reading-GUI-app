@@ -11,13 +11,13 @@ A lightweight PDF reader desktop app built with Python and CustomTkinter. Suppor
 
 ## Features
 
-- 📂 Add PDFs from your local file system
-- 🌐 Add PDFs directly from a URL
-- 🔍 Zoom in and out while staying on the current page
-- ⬅️ ➡️ Navigate pages with previous/next buttons or by typing a page number
-- 💾 Automatically saves and restores your reading progress per book
-- ⚡ Lazy rendering — only renders pages near the visible area for smooth scrolling on large documents
-- 🗂️ Persistent library — your added PDFs are saved and restored on every startup
+- Add PDFs from your local file system
+- Add PDFs directly from a URL
+- Zoom in and out while staying on the current page
+- Navigate pages with previous/next buttons or by typing a page number
+- Automatically saves and restores your reading progress per book
+- Lazy rendering — only renders pages near the visible area for smooth scrolling on large documents
+- Persistent library — your added PDFs are saved and restored on every startup
 
 ---
 
